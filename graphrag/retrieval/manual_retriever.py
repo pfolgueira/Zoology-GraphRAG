@@ -9,7 +9,7 @@ class ManualRetriever:
         self.neo4j = neo4j_manager
         self.settings = get_settings()
 
-    def retrieve_predefined(self, query_category: str, **kwargs) -> Tuple[str, List[Dict[str, Any]]]:
+    def retrieve(self, query_category: str, **kwargs) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Recupera y ejecuta una consulta Cypher predefinida basada en la categoría.
 

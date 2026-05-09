@@ -1,4 +1,6 @@
 from typing import List, Dict, Any, Optional
+
+from ..llm.groq_client import GroqClient
 from ..llm.ollama_client import OllamaClient
 from .retriever_tools import RetrieverTools
 from typing import Literal
@@ -9,8 +11,12 @@ class RouterDecision(BaseModel):
     """Schema for the LLM's routing decision."""
 
     tool: Literal[
-        "predefined_cypher", "hybrid_search", "text2cypher",
-        "greeting", "out_of_scope", "skills"
+        "predefined_species_full_profile",
+        "hybrid_search",
+        "text2cypher",
+        "greeting",
+        "out_of_scope",
+        "skills",
     ] = Field(
         ...,
         description="The name of the tool selected to handle the query."
@@ -19,29 +25,39 @@ class RouterDecision(BaseModel):
         ...,
         description="Brief explanation of why this tool was chosen based on the question."
     )
-    query: str = Field(
-        ...,
-        description="The reformulated or original query to be passed to the tool."
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Tool-specific parameters as key-value pairs. "
+            "For hybrid_search and text2cypher: {'query': '...'}. "
+            "For predefined_species_full_profile: {'species_name': '...'}. "
+            "For greeting, out_of_scope, skills: leave empty {}."
+        )
     )
-
 
 class RetrieverRouter:
     def __init__(self, retriever_tools: RetrieverTools):
         self.tools = retriever_tools
-        self.client = OllamaClient()
+        self.client = GroqClient()
 
     def route(self, question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> RouterDecision:
         """
         Selecciona la mejor herramienta para responder la pregunta.
         """
         conversation_history = conversation_history or []
+        
+        
+        def format_tool(tool: dict) -> str:
+            lines = [f"- {tool['name']}: {tool['description']}"]
+            params = tool.get("parameters", {})
+            if params:
+                lines.append("  Parameters:")
+                for param_name, param_desc in params.items():
+                    lines.append(f"    - {param_name}: {param_desc}")
+            return "\n".join(lines)
 
-        # Obtener descripciones de herramientas
         tool_descriptions = self.tools.get_tool_descriptions()
-        tools_str = "\n".join([
-            f"- {tool['name']}: {tool['description']}"
-            for tool in tool_descriptions
-        ])
+        tools_str = "\n".join(format_tool(tool) for tool in tool_descriptions)
 
         system_prompt = f"""You are an expert routing assistant for a zoology and animal biology knowledge base.
 Your only job is to analyze the user's query and select the single most appropriate tool to handle it.
@@ -63,7 +79,7 @@ ROUTING RULES — Apply strictly in the following order:
 - Use when the question is clearly unrelated to zoology, animal biology, or the natural world.
 - Examples: "What is the capital of France?", "Who won the World Cup?", "Give me a recipe for cake."
 
-4. predefined_cypher
+4. predefined cypher queries
 - Use when the query is a common, direct question about animal relationships that matches one of the predefined Cypher queries.
 - Examples: "Give me all the info about lions"
 
@@ -96,9 +112,9 @@ Respond ONLY with a JSON object matching the schema, without any additional text
         decision = self.route(question, conversation_history)
 
         tool_name = decision.tool
-        query = decision.query or question
+        params = decision.parameters
 
-        result = self.tools.execute_tool(tool_name, query=query)
+        result = self.tools.execute_tool(tool_name, **params)
         result["routing_decision"] = decision
 
         return result

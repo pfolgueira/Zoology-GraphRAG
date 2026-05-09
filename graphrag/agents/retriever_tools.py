@@ -137,51 +137,64 @@ class RetrieverTools:
                 }
             },
             {
-                "name": "predefined_cypher",
-                "description": "Executes predefined graph queries for specific or complex zoology topics. "
-                                "You MUST use this tool IF the user's question matches one of the available predefined query categories. "
-                                "Do NOT use text2cypher or hybrid search if the intent matches one of these specific scenarios.",
+                "name": "predefined_species_full_profile",
+                "description": (
+                    "Retrieves a complete structured profile of a specific animal species from the knowledge graph. "
+                    "Use this tool when the user asks for a full summary or complete overview of a species "
+                    "(e.g., 'tell me everything about the lion', 'give me a full profile of the tiger', "
+                    "'complete summary of the African elephant'). "
+                    "DO NOT use this tool for partial queries, comparisons, aggregations, or general habitat/diet questions."
+                ),
                 "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query_category": {
-                            "type": "string",
-                            "description": (
-                                "The category of the predefined query to execute. You must select the one that "
-                                "best matches the user's question intent."
-                            ),
-                            "literal": [ # Podríamos cambiarlo a literal
-                                "species_full_profile",
-                                # "apex_predators_by_location",
-                                # "migration_diet_analysis",
-                                # "endangered_by_environment",
-                                # "family_extremes_comparison"
-                            ]
-                        },
-                        "species_name": {
-                            "type": "string",
-                            "description": "The name of the animal species. REQUIRED if query_category is 'species_full_profile'."
-                        },
-                        # "location_name": {
-                        #     "type": "string",
-                        #     "description": "The name of the geographic location or region. REQUIRED if query_category is 'apex_predators_by_location' or 'migration_diet_analysis'."
-                        # },
-                        # "environment_name": {
-                        #     "type": "string",
-                        #     "description": "The type of environment (e.g., marine, desert). REQUIRED if query_category is 'endangered_by_environment'."
-                        # },
-                        # "family_name": {
-                        #     "type": "string",
-                        #     "description": "The taxonomic family name (e.g., Felidae). REQUIRED if query_category is 'family_extremes_comparison'."
-                        # },
-                        # "season_name": {
-                        #     "type": "string",
-                        #     "description": "The season of the year (e.g., winter, summer). REQUIRED if query_category is 'migration_diet_analysis'."
-                        # }
-                    },
-                    "required": ["query_category"]
+                    "species_name": "The name of the animal species to retrieve the full profile for (e.g., 'lion', 'tiger')."
                 }
-            }
+            },
+            # {
+            #     "name": "predefined_cypher",
+            #     "description": "Executes predefined graph queries for specific or complex zoology topics. "
+            #                     "You MUST use this tool IF the user's question matches one of the available predefined query categories. "
+            #                     "Do NOT use text2cypher or hybrid search if the intent matches one of these specific scenarios.",
+            #     "parameters": {
+            #         "type": "object",
+            #         "properties": {
+            #             "query_category": {
+            #                 "type": "string",
+            #                 "description": (
+            #                     "The category of the predefined query to execute. You must select the one that "
+            #                     "best matches the user's question intent."
+            #                 ),
+            #                 "literal": [ # Podríamos cambiarlo a literal
+            #                     "species_full_profile",
+            #                     # "apex_predators_by_location",
+            #                     # "migration_diet_analysis",
+            #                     # "endangered_by_environment",
+            #                     # "family_extremes_comparison"
+            #                 ]
+            #             },
+            #             "species_name": {
+            #                 "type": "string",
+            #                 "description": "The name of the animal species. REQUIRED if query_category is 'species_full_profile'."
+            #             },
+            #             # "location_name": {
+            #             #     "type": "string",
+            #             #     "description": "The name of the geographic location or region. REQUIRED if query_category is 'apex_predators_by_location' or 'migration_diet_analysis'."
+            #             # },
+            #             # "environment_name": {
+            #             #     "type": "string",
+            #             #     "description": "The type of environment (e.g., marine, desert). REQUIRED if query_category is 'endangered_by_environment'."
+            #             # },
+            #             # "family_name": {
+            #             #     "type": "string",
+            #             #     "description": "The taxonomic family name (e.g., Felidae). REQUIRED if query_category is 'family_extremes_comparison'."
+            #             # },
+            #             # "season_name": {
+            #             #     "type": "string",
+            #             #     "description": "The season of the year (e.g., winter, summer). REQUIRED if query_category is 'migration_diet_analysis'."
+            #             # }
+            #         },
+            #         "required": ["query_category"]
+            #     }
+            # }
             
         ]
 
@@ -223,14 +236,10 @@ class RetrieverTools:
                 "context": [],
                 "direct_response": self._SKILLS_RESPONSE,
             }
-        if tool_name == "predefined_cypher":
+        if tool_name == "predefined_species_full_profile":
             cypher, results = self.manual_retriever.retrieve(
-                query_category=kwargs.get("query_category", ""),
-                species_name=kwargs.get("species_name", ""),
-                # location_name=kwargs.get("location_name", ""),
-                # environment_name=kwargs.get("environment_name", ""),
-                # family_name=kwargs.get("family_name", ""),
-                # season_name=kwargs.get("season_name", "")
+                query_category="species_full_profile",  # fijo, lo determina el tool_name
+                species_name=kwargs.get("species_name", "").title(),
             )
             return {
                 "tool": tool_name,

@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from ..llm.ollama_client import OllamaClient
+from ..llm.groq_client import GroqClient
 
 class AnswerCritique(BaseModel):
     """Pydantic schema representing the evaluation of an answer."""
@@ -20,7 +21,7 @@ class AnswerCritique(BaseModel):
 
 class AnswerCritic:
     def __init__(self):
-        self.client = OllamaClient()
+        self.client = GroqClient()
 
     def critique(self, question: str, context: List[str], answer: str) -> Dict[str, Any]:
         """
