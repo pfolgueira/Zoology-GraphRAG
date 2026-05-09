@@ -36,7 +36,7 @@ class AgenticRAG:
                 self.conversation_history
             )
 
-            # 2a. Greeting / out-of-scope: return the fixed response immediately
+            # 2a. Greeting / out-of-scope / skills: return the fixed response immediately
             if "direct_response" in retrieval_result:
                 answer = retrieval_result["direct_response"]
                 iterations.append({
@@ -109,15 +109,16 @@ class AgenticRAG:
         """Genera una respuesta usando el LLM."""
         context_str = "\n\n".join([f"[{i + 1}] {c}" for i, c in enumerate(context)])
 
-        system_prompt = """You are a concise question-answering assistant.
+        system_prompt = """You are an expert question-answering assistant specializing in zoology and animal biology. 
+Your task is to answer the user's question using ONLY the provided context.
 
 STRICT RULES — follow all of them:
-1. Answer ONLY from the provided context. Do not use prior knowledge.
-2. Start your reply with the answer itself. Never begin with "I", "Let me", "Based on", "The context", or any preamble.
-3. Do not explain your reasoning or thinking process. Only state facts.
-4. Keep the answer short: one or two sentences maximum.
-5. Add an inline citation after each fact, e.g. "Ulm, Germany [1]."
-6. If the context does not contain the answer, reply: "This information is not in the knowledge base."
+1. NO PRIOR KNOWLEDGE: Answer exclusively from the provided context. Do not use outside information.
+2. DIRECT START: Begin your reply with the answer itself. Never use filler phrases like "I", "Let me", "Based on the context", or "The text states".
+3. NO EXPLANATIONS: Do not explain your reasoning or thinking process. Only state facts.
+4. CONCISENESS: Keep the answer as concise as possible, ideally not exceeding one paragraph.
+5. CITATIONS: Add an inline citation immediately after each distinct fact using brackets. Example: "The blue whale's heart weighs about 400 pounds [1]."
+6. FALLBACK: If the provided context does not contain the answer to the question, reply EXACTLY with: "This information is not in the knowledge base."
 """
 
         user_message = f"Context:\n{context_str}\n\nQuestion: {question}"

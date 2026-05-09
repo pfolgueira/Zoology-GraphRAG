@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Callable, TypedDict
 
 from ..retrieval.manual_retriever import ManualRetriever
-from ..retrieval.vector_retriever import VectorRetriever
 from ..retrieval.hybrid_retriever import HybridRetriever
 from ..retrieval.text2cypher import Text2CypherRetriever
 from ..graph.neo4j_manager import Neo4jManager
@@ -16,7 +15,6 @@ class ToolData(TypedDict):
 class RetrieverTools:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
-        self.vector_retriever = VectorRetriever(neo4j_manager)
         self.hybrid_retriever = HybridRetriever(neo4j_manager)
         self.text2cypher = Text2CypherRetriever(neo4j_manager)
         self.manual_retriever = ManualRetriever(neo4j_manager)
@@ -152,7 +150,7 @@ class RetrieverTools:
                                 "The category of the predefined query to execute. You must select the one that "
                                 "best matches the user's question intent."
                             ),
-                            "enum": [
+                            "literal": [ # Podríamos cambiarlo a literal
                                 "species_full_profile",
                                 # "apex_predators_by_location",
                                 # "migration_diet_analysis",
@@ -164,8 +162,6 @@ class RetrieverTools:
                             "type": "string",
                             "description": "The name of the animal species. REQUIRED if query_category is 'species_full_profile'."
                         },
-
-                        
                         # "location_name": {
                         #     "type": "string",
                         #     "description": "The name of the geographic location or region. REQUIRED if query_category is 'apex_predators_by_location' or 'migration_diet_analysis'."
@@ -241,13 +237,6 @@ class RetrieverTools:
                 "cypher": cypher,
                 "results": results,
                 "context": [str(r) for r in results]
-            }
-        if tool_name == "vector_search":
-            results = self.vector_retriever.retrieve(kwargs.get("query", ""))
-            return {
-                "tool": tool_name,
-                "results": results,
-                "context": [r["text"] for r in results]
             }
 
         elif tool_name == "hybrid_search":
