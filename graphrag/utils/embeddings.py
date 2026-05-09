@@ -1,10 +1,11 @@
 from typing import List
 from ..llm.ollama_client import OllamaClient
+from ..llm.groq_client import GroqClient
 
 
 class EmbeddingGenerator:
     def __init__(self):
-        self.client = OllamaClient()
+        self.client = GroqClient()
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """Genera embeddings para una lista de textos."""

@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 from graphrag.config import get_settings
 from graphrag.graph.neo4j_manager import Neo4jManager
 from graphrag.llm.ollama_client import OllamaClient
+from graphrag.llm.groq_client import GroqClient
 
 
 class FullTextRetriever:
@@ -10,7 +11,7 @@ class FullTextRetriever:
         self.neo4j = neo4j_manager
         self.settings = get_settings()
         self._create_fulltext_index()
-        self.client = OllamaClient()
+        self.client = GroqClient()
 
     def _create_fulltext_index(self):
         """Crea un índice de texto completo."""

@@ -1,12 +1,13 @@
 from typing import List, Dict, Any, Tuple
 from ..graph.neo4j_manager import Neo4jManager
 from ..llm.ollama_client import OllamaClient
+from ..llm.groq_client import GroqClient
 
 
 class Text2CypherRetriever:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
-        self.client = OllamaClient()
+        self.client = GroqClient()
         self.few_shot_examples = []
         self.terminology_maps = {} # Nuevo: Diccionario para almacenar mapas terminológicos
 
