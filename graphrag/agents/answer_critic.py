@@ -1,6 +1,22 @@
 from typing import List, Dict, Any
+from pydantic import BaseModel, Field
 from ..llm.ollama_client import OllamaClient
 
+class AnswerCritique(BaseModel):
+    """Pydantic schema representing the evaluation of an answer."""
+    is_complete: bool = Field(
+        description="True if the answer fully addresses all aspects of the user's question. False otherwise."
+    )
+    is_faithful: bool = Field(
+        description="True if all claims in the answer are strictly supported by the provided context (no hallucinations). False otherwise."
+    )
+    missing_info: List[str] = Field(
+        default_factory=list,
+        description="If incomplete, a list of specific search queries or questions needed to find the missing information. Empty if complete."
+    )
+    feedback: str = Field(
+        description="A concise explanation justifying the evaluation, pointing out specific flaws or missing details."
+    )
 
 class AnswerCritic:
     def __init__(self):
@@ -36,6 +52,26 @@ Respond ONLY with valid JSON in this format:
 
 If the answer is complete and faithful, missing_info should be an empty list."""
 
+        system_prompt = f"""You are an expert at evaluating answers to questions based on provided context. Your job is to evaluate a generated answer against a user's question and the provided context.
+
+### EVALUATION CRITERIA:
+1. FAITHFULNESS (is_faithful): 
+   - Check every single claim made in the answer.
+   - If the answer contains ANY information, facts, or numbers not explicitly stated in the context, it is UNFAITHFUL (False).
+   - Deductions or logical leaps outside the context text are strictly forbidden.
+
+2. COMPLETENESS (is_complete):
+   - Does the answer address every part of the user's question?
+   - If the question has multiple parts and the answer misses one, it is INCOMPLETE (False).
+
+3. MISSING INFO (missing_info):
+   - If the answer is incomplete, what exactly is missing? 
+   - Formulate these as clear search queries or follow-up questions that a retrieval system could use to find the missing data.
+
+### OUTPUT FORMAT:
+Respond ONLY with the required JSON schema.
+"""
+
         user_message = f"""Question: {question}
 
 Context:
@@ -43,14 +79,16 @@ Context:
 
 Answer: {answer}
 
-Evaluate this answer."""
-
+Evaluate this answer and output the JSON."""
+        
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
 
-        response = self.client.chat(messages, format="json")
-        critique = self.client.extract_json(response)
+        response = self.client.structured_output_with_chat(messages, schema=AnswerCritique)
 
-        return critique
+        return response.model_dump()
+    
+
+

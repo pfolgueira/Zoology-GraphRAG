@@ -9,7 +9,7 @@ class RouterDecision(BaseModel):
     """Schema for the LLM's routing decision."""
 
     tool: Literal[
-        "vector_search", "hybrid_search", "text2cypher",
+        "predefined_cypher", "hybrid_search", "text2cypher",
         "greeting", "out_of_scope", "skills"
     ] = Field(
         ...,
@@ -43,58 +43,42 @@ class RetrieverRouter:
             for tool in tool_descriptions
         ])
 
-#         system_prompt = f"""You are a routing assistant for a knowledge base about zoology and animal biology.
-# Select the single best tool for the user's question.
+        system_prompt = f"""You are an expert routing assistant for a zoology and animal biology knowledge base.
+Your only job is to analyze the user's query and select the single most appropriate tool to handle it.
 
-# Available tools:
-# {tools_str}
-
-# ROUTING RULES — apply in order:
-
-# 1. greeting     — Use when the message is conversational and needs NO knowledge lookup:
-#    greetings ("Hello", "Hi", "Good morning"), farewells ("Goodbye", "Thanks"),
-#    questions about the system ("What can you do?", "How do you work?", "What topics do you cover?").
-
-# 2. out_of_scope — Use when the question is clearly unrelated to zoology or animals:
-#    weather, sports, cooking, geography unrelated to animals, movies, music, politics.
-#    Examples: "What is the capital of France?", "Who won the World Cup?".
-
-# 3. skills - Use when the user asks about the system's capabilities in a general way, but not for specific questions about animals.
-
-# 4. vector_search — 
-
-# 5. hybrid_search — 
-
-# 6. text2cypher   — 
-
-# Choose greeting or out_of_scope FIRST before considering any retrieval tool.
-# """
-
-        system_prompt = f"""You are a routing assistant for a knowledge base about zoology and animal biology.
-Select the single best tool for the user's question.
-
-Available tools:
+Available tools and their descriptions:
 {tools_str}
 
- ROUTING RULES — apply in order:
+ROUTING RULES — Apply strictly in the following order:
 
- 1. greeting     — Use when the message is conversational and needs NO knowledge lookup:
-    greetings ("Hello", "Hi", "Good morning"), farewells ("Goodbye", "Thanks"),
-    questions about the system ("What can you do?", "How do you work?", "What topics do you cover?").
+1. greeting — Use when the message is conversational and needs NO knowledge lookup:
+- Examples: "Hello", "Hi", "Good morning", "Thanks", "Goodbye", "Who are you?".
+- Do NOT use this if the user asks about what the system can do.
 
- 2. out_of_scope — Use when the question is clearly unrelated to zoology or animals:
-    weather, sports, cooking, geography unrelated to animals, movies, music, politics.
-    Examples: "What is the capital of France?", "Who won the World Cup?".
+2. skills
+- Use ONLY when the user explicitly asks about the system's features, topics, or how to use it.
+- Examples: "What can you do?", "What kind of animal questions can I ask?", "How do you work?".
 
- 3. skills - Use when the user asks about the system's capabilities in a general way, but not for specific questions about animals.
+3. out_of_scope
+- Use when the question is clearly unrelated to zoology, animal biology, or the natural world.
+- Examples: "What is the capital of France?", "Who won the World Cup?", "Give me a recipe for cake."
 
- 4. predefined_cypher - Check if user's query matches a predefined Cypher query. Use when the question can be answered by a predefined Cypher query. This is for common, well-known questions that have a direct mapping to a Cypher query. 
+4. predefined_cypher
+- Use when the query is a common, direct question about animal relationships that matches one of the predefined Cypher queries.
+- Examples: "Give me all the info about lions"
 
- 5. hybrid_search
+5. text2cypher
+- Use for complex analytical questions requiring aggregations, counts, or multi-hop relationship traversals in a graph database.
+- Good for: "How many", "Which species share...", "List all..."
+- Examples: "How many species of mammals live in the Amazon?", "List all predators of the African elephant that also live in savannas.", "Which species are both predators and prey?"
 
- 6. text2cypher 
+6. hybrid_search
+- Use for qualitative questions, conceptual explanations, or broad semantic searches over unstructured text documents.
+- Good for: "How", "Why", "Describe", or general biological concepts.
+- Examples: "How does a chameleon change its color?", "Describe the mating dance of the albatross", "Why do birds migrate?"
 
- Choose greeting or out_of_scope FIRST before considering any retrieval tool.
+OUTPUT FORMAT:
+Respond ONLY with a JSON object matching the schema, without any additional text or explanation.
 """
 
         messages = [
