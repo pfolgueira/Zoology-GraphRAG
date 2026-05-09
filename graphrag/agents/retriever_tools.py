@@ -27,7 +27,7 @@ class RetrieverTools:
             "description": description
         }
 
-    GREETING_RESPONSES = [
+    _GREETING_RESPONSES = [
         # 🦉 El Búho Sabiondo
         ("Hoot hoot! 🦉 I am a highly intellectual knowledge assistant perched at the top of the animal kingdom. "
         "You can ask me about our taxonomy, physical or behavioral traits, diet (preferably mice 🐁), habitats, and "

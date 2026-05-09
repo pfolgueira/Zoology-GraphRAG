@@ -134,3 +134,11 @@ STRICT RULES — follow all of them:
     def reset_conversation(self):
         """Reinicia el historial de conversación."""
         self.conversation_history = []
+
+    def add_text2cypher_example(self, question: str, cypher: str):
+        """Agrega un ejemplo al prompt de text2cypher."""
+        self.router.tools.text2cypher.add_few_shot_example(question, cypher)
+
+    def add_terminology_map(self, term: str, description: str):
+        """Agrega un término al mapa de terminología."""
+        self.router.tools.text2cypher.add_terminology_map(term, description)

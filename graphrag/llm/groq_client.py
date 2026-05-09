@@ -30,7 +30,7 @@ class GroqClient:
 
     def _rate_limit_delay(self):
         """Pausa para evitar límites de tasa de Groq."""
-        time.sleep(2)
+        time.sleep(0)
 
     def chat(
             self,

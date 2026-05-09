@@ -67,7 +67,8 @@ Available tools and their descriptions:
 
 ROUTING RULES — Apply strictly in the following order:
 
-1. greeting — Use when the message is conversational and needs NO knowledge lookup:
+1. greeting 
+— Use when the message is conversational and needs NO knowledge lookup:
 - Examples: "Hello", "Hi", "Good morning", "Thanks", "Goodbye", "Who are you?".
 - Do NOT use this if the user asks about what the system can do.
 
@@ -84,9 +85,9 @@ ROUTING RULES — Apply strictly in the following order:
 - Examples: "Give me all the info about lions"
 
 5. text2cypher
-- Use for complex analytical questions requiring aggregations, counts, or multi-hop relationship traversals in a graph database.
-- Good for: "How many", "Which species share...", "List all..."
-- Examples: "How many species of mammals live in the Amazon?", "List all predators of the African elephant that also live in savannas.", "Which species are both predators and prey?"
+- Use for extracting specific factual data, structured relationships (like diet, habitat, prey/predator), and complex analytical questions (aggregations, counts) in a graph database.
+- Good for: "What do X eat/hunt?", "Where do X live?", "What is the speed/weight/lifespan of X?", "How many...", "Which animals...", "List all...".
+- Examples: "What animals do wolves hunt?", "What type of diet do tigers have?", "Which animals have a lifespan greater than 50 years?", "How many species of mammals live in the Amazon?".
 
 6. hybrid_search
 - Use for qualitative questions, conceptual explanations, or broad semantic searches over unstructured text documents.
