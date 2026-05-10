@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 
 from ..llm.groq_client import GroqClient
+from ..llm.gemini_client import GeminiClient
 from ..llm.ollama_client import OllamaClient
 from .retriever_tools import RetrieverTools
 from typing import Literal
@@ -69,7 +70,7 @@ class RouterDecision(BaseModel):
 class RetrieverRouter:
     def __init__(self, retriever_tools: RetrieverTools):
         self.tools = retriever_tools
-        self.client = GroqClient()
+        self.client = GeminiClient()
 
     def route(self, question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> RouterDecision:
         """

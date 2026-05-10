@@ -133,7 +133,7 @@ class RetrieverTools:
                             "(e.g., 'how many animals...', 'list all species in the family X', 'what is the exact diet of Y'). "
                             "DO NOT use this tool for requesting long-form text, general explanations, or descriptive paragraphs.",
                 "parameters": {
-                    "query": "The user's exact question in natural language, to be translated into Cypher."
+                    "query": "The user's EXACT question in natural language, to be translated into Cypher."
                 }
             },
             {

@@ -5,12 +5,13 @@ from .retriever_tools import RetrieverTools
 from .retriever_router import RetrieverRouter
 from .answer_critic import AnswerCritic
 from ..llm.groq_client import GroqClient
+from ..llm.gemini_client import GeminiClient
 
 
 class AgenticRAG:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
-        self.client = GroqClient()
+        self.client = GeminiClient()
         self.tools = RetrieverTools(neo4j_manager)
         self.router = RetrieverRouter(self.tools)
         self.critic = AnswerCritic()
