@@ -72,6 +72,7 @@ class AgenticRAG:
             iterations.append({
                 "iteration": iteration + 1,
                 "question": current_question,
+                "tools": retrieval_result.get("tools", [retrieval_result.get("tool")]),
                 "retrieval": retrieval_result,
                 "answer": answer,
                 "critique": critique
