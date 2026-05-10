@@ -24,4 +24,5 @@ dependencies = [
     "sentence-transformers>=5.4.1",
     "pandas>=3.0.2",
     "groq>=1.2.0",
+    "rapidfuzz>=3.14.5",
 ]

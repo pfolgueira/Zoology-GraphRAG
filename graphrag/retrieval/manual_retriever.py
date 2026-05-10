@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Tuple
+from rapidfuzz import process, fuzz
 
 from graphrag.config import get_settings
 from graphrag.graph.neo4j_manager import Neo4jManager
@@ -8,19 +9,54 @@ class ManualRetriever:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
         self.settings = get_settings()
+        self._known_species: List[str] = self._load_known_species()
+
+    def _load_known_species(self) -> List[str]:
+        """Carga y cachea todos los nombres de especies de la BD."""
+        try:
+            result = self.neo4j.execute_query("MATCH (s:Species) RETURN s.name AS name")
+            return [r["name"] for r in result]
+        except Exception as e:
+            print(f"Warning: could not load species list: {e}")
+            return []
+
+    def normalize_species_name(self, raw_name: str) -> str:
+        """
+        Normaliza el nombre de una especie al formato de la BD:
+        1. Coincidencia exacta en title case
+        2. Nombre genérico (una sola palabra del input)
+        3. Levenshtein como fallback para typos
+        """
+        normalized = raw_name.strip().title()
+
+        # 1. Coincidencia exacta
+        if normalized in self._known_species:
+            return normalized
+
+        # 2. La BD usa nombres genéricos: probar cada palabra por separado
+        for word in normalized.split():
+            if word in self._known_species:
+                return word
+
+        # 3. Levenshtein como fallback
+        if self._known_species:
+            match, score, _ = process.extractOne(
+                normalized, self._known_species, scorer=fuzz.WRatio
+            )
+            if score >= 80:
+                return match
+
+        return normalized
 
     def retrieve(self, query_category: str, **kwargs) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Recupera y ejecuta una consulta Cypher predefinida basada en la categoría.
-
-        Args:
-            query_category (str): El identificador de la consulta manual (ej. 'species_full_profile').
-            **kwargs: Parámetros variables necesarios para la consulta (ej. species_name="Lion").
-
-        Returns:
-            Tupla con (cypher_query, results)
         """
-        
+
+        # Normalizar species_name si viene en kwargs
+        if "species_name" in kwargs:
+            kwargs["species_name"] = self.normalize_species_name(kwargs["species_name"])
+
         query_templates = {
             "species_full_profile": """
                 MATCH (s:Species {name: $species_name})
@@ -58,39 +94,30 @@ class ManualRetriever:
                     s.top_speed_kmh AS TopSpeed,
                     s.lifespan_years AS Lifespan
             """,
-            # "apex_predators_by_location": """
-            #     MATCH (predator:Species)-[:FOUND_IN]->(l:Location {type: $location_name})
-            #     MATCH (predator)-[:PREYS_ON]->(prey:Species)
-            #     WHERE NOT EXISTS { ()-[:PREYS_ON]->(predator) }
-            #     RETURN predator.name AS ApexPredator, 
-            #         predator.weight_max_kg AS Weight,
-            #         collect(DISTINCT prey.name) AS Preys
-            #     ORDER BY predator.weight_max_kg DESC
-            # """,
-            # "migration_diet_analysis": """
-            #     MATCH (s:Species)-[m:MIGRATES_TO]->(l:Location {type: $location_name})
-            #     WHERE toLower(m.season) = toLower($season_name)
-            #     OPTIONAL MATCH (s)-[:FEEDS_ON]->(fs:FoodSource)
-            #     OPTIONAL MATCH (s)-[:HAS_CONSERVATION_STATUS]->(cs:ConservationStatus)
-            #     RETURN s.name AS Species, m.season AS Season, cs.type AS Status,
-            #         collect(DISTINCT fs.type) AS FoodSources
-            # """,
-            # "endangered_by_environment": """
-            #     MATCH (s:Species)-[:LIVES_IN_ENVIRONMENT]->(e:EnvironmentType {type: $environment_name})
-            #     MATCH (s)-[:HAS_CONSERVATION_STATUS]->(cs:ConservationStatus)
-            #     WHERE cs.type IN ['Endangered', 'Critically Endangered', 'Vulnerable']
-            #     OPTIONAL MATCH (s)-[:REPRODUCES_VIA]->(rm:ReproductionMethod)
-            #     RETURN s.name AS Species, cs.type AS Status, s.lifespan_years AS Lifespan,
-            #         collect(DISTINCT rm.type) AS ReproductionMethods
-            #     ORDER BY s.lifespan_years ASC
-            # """,
-            # "family_extremes_comparison": """
-            #     MATCH (s:Species)-[:MEMBER_OF_FAMILY]->(f:Family {type: $family_name})
-            #     RETURN s.name AS Species, s.weight_max_kg AS MaxWeightKG, 
-            #         s.top_speed_kmh AS TopSpeedKMH, s.length_max_m AS MaxLengthM
-            #     ORDER BY s.weight_max_kg DESC
-            #     LIMIT 5
-            # """
+            "endangered_by_environment": """
+                MATCH (s:Species)-[:LIVES_IN_ENVIRONMENT]->(e:EnvironmentType {type: $environment_name})
+                MATCH (s)-[:HAS_CONSERVATION_STATUS]->(c:ConservationStatus)
+                WHERE c.type IN ['CR (Critically Endangered)', 'EN (Endangered)']
+                RETURN s.name, c.type, e.type
+                ORDER BY c.type
+            """,
+            "predator_prey_chain": """
+                MATCH (s:Species {name: $species_name})
+                OPTIONAL MATCH (predator:Species)-[:PREYS_ON]->(s)
+                OPTIONAL MATCH (s)-[:PREYS_ON]->(prey:Species)
+                OPTIONAL MATCH (s)-[:FEEDS_ON]->(food:FoodSource)
+                RETURN 
+                    s.name AS species,
+                    collect(DISTINCT predator.name) AS hunted_by,
+                    collect(DISTINCT prey.name) AS hunts,
+                    collect(DISTINCT food.type) AS feeds_on
+            """,
+            "social_structure_by_class": """
+                MATCH (s:Species)-[:BELONGS_TO_CLASS]->(c:AnimalClass {type: $class_name})
+                MATCH (s)-[:ORGANIZED_IN]->(ss:SocialStructure)
+                RETURN ss.type AS social_structure, count(s) AS species_count
+                ORDER BY species_count DESC
+            """,
         }
 
         cypher = query_templates.get(query_category)

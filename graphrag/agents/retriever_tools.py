@@ -146,56 +146,59 @@ class RetrieverTools:
                     "DO NOT use this tool for partial queries, comparisons, aggregations, or general habitat/diet questions."
                 ),
                 "parameters": {
-                    "species_name": "The name of the animal species to retrieve the full profile for (e.g., 'lion', 'tiger')."
+                    "species_name": "The name of the animal species to retrieve the full profile for (e.g., 'Lion', 'Tiger')."
                 }
             },
-            # {
-            #     "name": "predefined_cypher",
-            #     "description": "Executes predefined graph queries for specific or complex zoology topics. "
-            #                     "You MUST use this tool IF the user's question matches one of the available predefined query categories. "
-            #                     "Do NOT use text2cypher or hybrid search if the intent matches one of these specific scenarios.",
-            #     "parameters": {
-            #         "type": "object",
-            #         "properties": {
-            #             "query_category": {
-            #                 "type": "string",
-            #                 "description": (
-            #                     "The category of the predefined query to execute. You must select the one that "
-            #                     "best matches the user's question intent."
-            #                 ),
-            #                 "literal": [ # Podríamos cambiarlo a literal
-            #                     "species_full_profile",
-            #                     # "apex_predators_by_location",
-            #                     # "migration_diet_analysis",
-            #                     # "endangered_by_environment",
-            #                     # "family_extremes_comparison"
-            #                 ]
-            #             },
-            #             "species_name": {
-            #                 "type": "string",
-            #                 "description": "The name of the animal species. REQUIRED if query_category is 'species_full_profile'."
-            #             },
-            #             # "location_name": {
-            #             #     "type": "string",
-            #             #     "description": "The name of the geographic location or region. REQUIRED if query_category is 'apex_predators_by_location' or 'migration_diet_analysis'."
-            #             # },
-            #             # "environment_name": {
-            #             #     "type": "string",
-            #             #     "description": "The type of environment (e.g., marine, desert). REQUIRED if query_category is 'endangered_by_environment'."
-            #             # },
-            #             # "family_name": {
-            #             #     "type": "string",
-            #             #     "description": "The taxonomic family name (e.g., Felidae). REQUIRED if query_category is 'family_extremes_comparison'."
-            #             # },
-            #             # "season_name": {
-            #             #     "type": "string",
-            #             #     "description": "The season of the year (e.g., winter, summer). REQUIRED if query_category is 'migration_diet_analysis'."
-            #             # }
-            #         },
-            #         "required": ["query_category"]
-            #     }
-            # }
-            
+            {
+                "name": "predefined_endangered_by_environment",
+                "description": (
+                    "Retrieves endangered or critically endangered species filtered by their environment type. "
+                    "Use this tool when the user asks about threatened or endangered animals in a specific environment or habitat type. "
+                    "Examples: 'Which endangered species are flying animals?', 'What marine animals are critically endangered?', "
+                    "'List threatened species in terrestrial environments', 'Are there endangered flying animals?'. "
+                    "DO NOT use for general habitat questions or non-conservation queries."
+                ),
+                "parameters": {
+                    "environment_name": (
+                        "The environment type normalized to one of these exact values: "
+                        "'Aquatic', "
+                        "'Terrestrial', "
+                        "'Aerial'"
+                        "You MUST return one of these three values exactly, never a synonym."
+                    )
+                }
+            },
+            {
+                "name": "predefined_predator_prey_chain",
+                "description": (
+                    "Retrieves the complete feeding relationships of a specific species: "
+                    "what predators hunt it, what animal prey it hunts, and what non-animal food sources it feeds on. "
+                    "Use this tool when the user asks about the full predator-prey chain or feeding relationships of a species. "
+                    "Examples: 'What hunts the lion and what does it hunt?', 'Show me the predator-prey chain of the wolf', "
+                    "'What are the feeding relationships of the zebra?'. "
+                    "DO NOT use if the user only asks one direction (use text2cypher instead)."
+                ),
+                "parameters": {
+                    "species_name": "The name of the animal species to retrieve the predator-prey chain for (e.g., 'Lion', 'Zebra')."
+                }
+            },
+            {
+                "name": "predefined_social_structure_by_class",
+                "description": (
+                    "Retrieves the distribution of social structures among species of a specific animal class. "
+                    "Use this tool when the user asks about how animals of a given class are socially organized. "
+                    "Examples: 'How are mammals organized socially?', 'What social structures do reptiles have?', "
+                    "'Show me the social organization of birds'. "
+                    "DO NOT use for questions about a specific species or general social behavior descriptions."
+                ),
+                "parameters": {
+                    "class_name": (
+                        "The animal class normalized to one of these exact values: "
+                        "'Mammal', 'Reptile', 'Bird', 'Fish', 'Amphibian'. "
+                        "You MUST return one of these five values exactly, never a synonym or plural form."
+                    )
+                }
+            }       
         ]
 
         # Añadir herramientas personalizadas
@@ -247,6 +250,42 @@ class RetrieverTools:
                 "results": results,
                 "context": [str(r) for r in results]
             }
+        
+        if tool_name == "predefined_endangered_by_environment":
+            cypher, results = self.manual_retriever.retrieve(
+                query_category="endangered_by_environment",  # fijo, lo determina el tool_name
+                environment_name=kwargs.get("environment_name", "").title(),
+            )
+            return {
+                "tool": tool_name,
+                "cypher": cypher,
+                "results": results,
+                "context": [str(r) for r in results]
+            }
+        
+        if tool_name == "predefined_predator_prey_chain":
+            cypher, results = self.manual_retriever.retrieve(
+                query_category="predator_prey_chain",  # fijo, lo determina el tool_name
+                species_name=kwargs.get("species_name", "").title(),
+            )
+            return {
+                "tool": tool_name,
+                "cypher": cypher,
+                "results": results,
+                "context": [str(r) for r in results]
+            }
+        
+        if tool_name == "predefined_social_structure_by_class":
+            cypher, results = self.manual_retriever.retrieve(
+                query_category="social_structure_by_class",  # fijo, lo determina el tool_name
+                class_name=kwargs.get("class_name", "").title(),
+            )
+            return {
+                "tool": tool_name,
+                "cypher": cypher,
+                "results": results,
+                "context": [str(r) for r in results]
+            }
 
         elif tool_name == "hybrid_search":
             results = self.hybrid_retriever.retrieve(kwargs.get("query", ""))
@@ -258,6 +297,18 @@ class RetrieverTools:
 
         elif tool_name == "text2cypher":
             cypher, results = self.text2cypher.retrieve(kwargs.get("query", ""))
+
+            # Fallback a hybrid_search si text2cypher no devuelve resultados
+            if not results:
+                print(f"text2cypher returned no results, falling back to hybrid_search.")
+                fallback_results = self.hybrid_retriever.retrieve(kwargs.get("query", ""))
+                return {
+                    "tool": f"{tool_name}+hybrid_search_fallback",
+                    "cypher": cypher,
+                    "results": fallback_results,
+                    "context": [r["text"] for r in fallback_results]
+                }
+
             return {
                 "tool": tool_name,
                 "cypher": cypher,

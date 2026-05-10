@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Tuple
+from rapidfuzz import process, fuzz
 from ..graph.neo4j_manager import Neo4jManager
-from ..llm.ollama_client import OllamaClient
 from ..llm.groq_client import GroqClient
 
 
@@ -9,25 +9,98 @@ class Text2CypherRetriever:
         self.neo4j = neo4j_manager
         self.client = GroqClient()
         self.few_shot_examples = []
-        self.terminology_maps = {} # Nuevo: Diccionario para almacenar mapas terminológicos
+        self.terminology_maps = {}
+        self._known_species: List[str] = self._load_known_species()
 
-    def add_few_shot_example(self, question: str, cypher: str):
-        """Añade un ejemplo few-shot."""
-        self.few_shot_examples.append({
-            "question": question,
-            "cypher": cypher
-        })
+    def _load_known_species(self) -> List[str]:
+        """Carga y cachea todos los nombres de especies de la BD."""
+        try:
+            result = self.neo4j.execute_query("MATCH (s:Species) RETURN s.name AS name")
+            return [r["name"] for r in result]
+        except Exception as e:
+            print(f"Warning: could not load species list: {e}")
+            return []
 
-    def add_terminology_map(self, term: str, graph_equivalent: str):
+    def normalize_species_name(self, raw_name: str) -> str:
         """
-        Añade una regla al mapa terminológico.
+        Normaliza el nombre de una especie al formato de la BD:
+        1. Title case exacto
+        2. Nombre genérico (una sola palabra del input)
+        3. Levenshtein como fallback para typos
         """
-        self.terminology_maps[term] = graph_equivalent
+        normalized = raw_name.strip().title()
+
+        # 1. Coincidencia exacta
+        if normalized in self._known_species:
+            return normalized
+
+        # 2. La BD usa nombres genéricos: probar cada palabra por separado
+        for word in normalized.split():
+            if word in self._known_species:
+                return word
+
+        # 3. Levenshtein como fallback
+        if self._known_species:
+            match, score, _ = process.extractOne(
+                normalized, self._known_species, scorer=fuzz.WRatio
+            )
+            if score >= 80:
+                return match
+
+        return normalized
+
+    def _extract_and_normalize_species(self, question: str) -> str:
+        """
+        Detecta y normaliza TODOS los nombres de especies en la pregunta.
+        """
+        normalized_question = question
+
+        # 1. Buscar coincidencias directas (multi-palabra primero, luego simple)
+        # Ordenar por longitud descendente para que "African Elephant" matchee antes que "Elephant"
+        sorted_species = sorted(self._known_species, key=len, reverse=True)
+        
+        matched_positions = set()
+        replacements = {}
+
+        for species in sorted_species:
+            lower_q = normalized_question.lower()
+            lower_s = species.lower()
+            idx = lower_q.find(lower_s)
+            if idx != -1 and idx not in matched_positions:
+                replacements[lower_s] = species
+                # Marcar posiciones ocupadas para no re-matchear
+                matched_positions.update(range(idx, idx + len(lower_s)))
+
+        for original, normalized in replacements.items():
+            normalized_question = normalized_question.lower().replace(original, normalized)
+
+        # 2. Levenshtein para palabras no matcheadas directamente
+        words = normalized_question.split()
+        result_words = []
+        i = 0
+        while i < len(words):
+            matched = False
+            for n in (3, 2):  # intentar trigramas y bigramas
+                if i + n <= len(words):
+                    chunk = " ".join(words[i:i+n]).strip("?.,!")
+                    normalized = self.normalize_species_name(chunk)
+                    if normalized != chunk.title():
+                        result_words.append(normalized)
+                        i += n
+                        matched = True
+                        break
+            if not matched:
+                result_words.append(words[i])
+                i += 1
+
+        return " ".join(result_words)
 
     def generate_cypher(self, question: str) -> str:
-        """
-        Genera una query Cypher a partir de una pregunta en lenguaje natural.
-        """
+        """Genera una query Cypher a partir de una pregunta en lenguaje natural."""
+
+        # Normalizar especies antes de pasarle la pregunta al LLM
+        question = self._extract_and_normalize_species(question)
+
         schema = self.neo4j.get_schema()
         schema_str = self.neo4j.format_schema(schema)
 

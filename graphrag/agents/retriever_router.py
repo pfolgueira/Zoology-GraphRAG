@@ -10,6 +10,9 @@ TOOL_REQUIRED_PARAMS: Dict[str, List[str]] = {
     "hybrid_search":                  ["query"],
     "text2cypher":                    ["query"],
     "predefined_species_full_profile": ["species_name"],
+    "predefined_endangered_by_environment": ["environment_name"],
+    "predefined_predator_prey_chain": ["species_name"],
+    "predefined_social_structure_by_class": ["class_name"],
     "greeting":                       [],
     "out_of_scope":                   [],
     "skills":                         [],
@@ -19,6 +22,9 @@ class ToolCall(BaseModel):
     """Representa una llamada a una herramienta con sus parámetros."""
     tool: Literal[
         "predefined_species_full_profile",
+        "predefined_endangered_by_environment",
+        "predefined_predator_prey_chain",
+        "predefined_social_structure_by_class",
         "hybrid_search",
         "text2cypher",
         "greeting",
@@ -30,7 +36,7 @@ class ToolCall(BaseModel):
         description=(
             "Parameters for this specific tool. "
             "For hybrid_search and text2cypher: {'query': '...'}. "
-            "For predefined_species_full_profile: {'species_name': '...'}. "
+            "For predefined queries: { parameter name: '...'}. "
             "For greeting, out_of_scope, skills: leave empty {}."
         )
     )
@@ -108,10 +114,10 @@ ROUTING RULES — Apply strictly in the following order:
 - Examples: "What is the capital of France?", "Who won the World Cup?", "Give me a recipe for cake."
 - NEVER combine with other tools.
 
-4. predefined_species_full_profile
-- Use when the user asks for a complete overview or full summary of a specific species.
-- Examples: "Give me all the info about lions", "Full profile of the tiger".
-- Can be combined with hybrid_search when the user also asks for additional descriptive context.
+4. predefined queries
+- Use these tools when the query matches one of the available predefined query scenarios.
+- ALWAYS prioritize these over text2cypher or hybrid_search when the intent clearly matches.
+- Each predefined tool has its own description and required parameters detailed in the tools list above.
 
 5. text2cypher
 - Use for extracting specific factual data, structured relationships, and complex analytical questions.
@@ -128,10 +134,10 @@ ROUTING RULES — Apply strictly in the following order:
 COMBINATION RULES:
 - Use a SINGLE tool for most queries.
 - Combine hybrid_search + text2cypher when the query needs both a descriptive explanation AND specific structured data (e.g., "Describe how lions hunt and list all their prey").
-- Combine hybrid_search + predefined_species_full_profile when the user wants a full species profile AND additional descriptive context.
+- Combine hybrid_search + predefined cypher query when the query matches a predefined scenario but also asks for a descriptive explanation.
 NEVER combine greeting, out_of_scope, or skills with any other tool, even if the query mixes topics:
-    * "Describe how lions hunt and how are you" → greeting only
-    * "Describe how lions hunt and who won the last World Cup" → out_of_scope only
+    * "Describe how lions hunt and how are you?" → greeting only
+    * "Describe how lions hunt and who won the last World Cup?" → out_of_scope only
     * "What can you do and what do lions eat?" → skills only
   In these cases, always prioritize the non-retrieval tool and discard the rest of the query.
 
@@ -146,21 +152,6 @@ Respond ONLY with a JSON object matching the schema, without any additional text
                    ]
 
         return self.client.structured_output_with_chat(messages, schema=RouterDecision)
-
-    def retrieve(self, question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
-        """
-        Selecciona la herramienta apropiada y ejecuta la búsqueda.
-        """
-        decision = self.route(question, conversation_history)
-
-        tool_name = decision.tool
-        params = decision.parameters
-
-        result = self.tools.execute_tool(tool_name, **params)
-        result["routing_decision"] = decision
-
-        return result
-    
 
     def retrieve(self, question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
         """
