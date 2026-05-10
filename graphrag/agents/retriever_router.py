@@ -10,14 +10,34 @@ from pydantic import BaseModel, Field, model_validator
 TOOL_REQUIRED_PARAMS: Dict[str, List[str]] = {
     "hybrid_search":                  ["query"],
     "text2cypher":                    ["query"],
-    "predefined_species_full_profile": ["species_name"],
-    "predefined_endangered_by_environment": ["environment_name"],
-    "predefined_predator_prey_chain": ["species_name"],
-    "predefined_social_structure_by_class": ["class_name"],
+    "predefined_species_full_profile": ["query", "species_name"],
+    "predefined_endangered_by_environment": ["query", "environment_name"],
+    "predefined_predator_prey_chain": ["query", "species_name"],
+    "predefined_social_structure_by_class": ["query", "class_name"],
     "greeting":                       [],
     "out_of_scope":                   [],
     "skills":                         [],
 }
+
+class ToolParameters(BaseModel):
+    """Contiene todos los parámetros posibles para cualquier herramienta."""
+    
+    query: Optional[str] = Field(
+        default=None, 
+        description="Query string for hybrid_search and text2cypher and all predefined tools."
+    )
+    species_name: Optional[str] = Field(
+        default=None, 
+        description="Name of the species for predefined_species_full_profile and predefined_predator_prey_chain."
+    )
+    environment_name: Optional[str] = Field(
+        default=None, 
+        description="Name of the environment for predefined_endangered_by_environment."
+    )
+    class_name: Optional[str] = Field(
+        default=None, 
+        description="Name of the biological class for predefined_social_structure_by_class."
+    )
 
 class ToolCall(BaseModel):
     """Representa una llamada a una herramienta con sus parámetros."""
@@ -32,22 +52,23 @@ class ToolCall(BaseModel):
         "out_of_scope",
         "skills",
     ]
-    parameters: Dict[str, Any] = Field(
-        default_factory=dict,
-        description=(
-            "Parameters for this specific tool. "
-            "For hybrid_search and text2cypher: {'query': '...'}. "
-            "For predefined queries: { parameter name: '...'}. "
-            "For greeting, out_of_scope, skills: leave empty {}."
-        )
+    parameters: ToolParameters = Field(
+        default_factory=ToolParameters,
+        description="Fill ONLY the parameters required for the chosen tool. Leave the rest empty."
     )
 
     @model_validator(mode="after")
     def validate_parameters(self) -> "ToolCall":
-        required = TOOL_REQUIRED_PARAMS.get(self.tool, [])
-        missing = [p for p in required if not self.parameters.get(p)]
+        required_params = TOOL_REQUIRED_PARAMS.get(self.tool, [])
+        
+        # 1. Convert the Pydantic object into a dictionary, ignoring empty (None) fields
+        param_dict = self.parameters.model_dump(exclude_none=True)
+        
+        # 2. Now you can safely use .get() on param_dict
+        missing = [p for p in required_params if not param_dict.get(p)]
         if missing:
             raise ValueError(f"Tool '{self.tool}' is missing required parameters: {missing}")
+        
         return self
 
 class RouterDecision(BaseModel):
@@ -160,11 +181,13 @@ Respond ONLY with a JSON object matching the schema, without any additional text
         """
         decision = self.route(question, conversation_history)
 
-        # Herramientas directas: no requieren búsqueda de conocimiento
+       # Herramientas directas: no requieren búsqueda de conocimiento
         direct_tools = {"greeting", "out_of_scope", "skills"}
         if decision.tool_calls[0].tool in direct_tools:
             tc = decision.tool_calls[0]
-            result = self.tools.execute_tool(tc.tool, **tc.parameters)
+            # Convert the Pydantic object to a dict before unpacking with **
+            kwargs = tc.parameters.model_dump(exclude_none=True)
+            result = self.tools.execute_tool(tc.tool, **kwargs)
             result["routing_decision"] = decision
             return result
 
@@ -174,13 +197,14 @@ Respond ONLY with a JSON object matching the schema, without any additional text
         combined_cypher = []
 
         for tc in decision.tool_calls:
-            result = self.tools.execute_tool(tc.tool, **tc.parameters)
+            kwargs = tc.parameters.model_dump(exclude_none=True)
+            result = self.tools.execute_tool(tc.tool, **kwargs)
+
             combined_results.extend(result.get("results", []))
-            combined_context.extend([
-                f"[{tc.tool}] {c}" for c in result.get("context", [])
-            ])
+            combined_context.extend(result.get("context", []))  # ya viene formateado
             if "cypher" in result:
                 combined_cypher.append(result["cypher"])
+
         return {
             "tools": [tc.tool for tc in decision.tool_calls],
             "results": combined_results,
@@ -188,3 +212,7 @@ Respond ONLY with a JSON object matching the schema, without any additional text
             "cypher": combined_cypher or None,
             "routing_decision": decision,
         }
+
+
+
+

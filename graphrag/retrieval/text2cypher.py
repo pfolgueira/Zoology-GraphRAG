@@ -1,9 +1,18 @@
 from typing import List, Dict, Any, Tuple
+from pydantic import BaseModel, Field
 from rapidfuzz import process, fuzz
 from ..graph.neo4j_manager import Neo4jManager
 from ..llm.groq_client import GroqClient
 from ..llm.gemini_client import GeminiClient
 
+class Species(BaseModel):
+    species: List[str] = Field(
+        default_factory=list,
+        description=(
+            "List of animal species identified in the user's question. "
+            "Each species must be written exactly as the user mentioned it. "
+        )
+    )
 
 class Text2CypherRetriever:
     def __init__(self, neo4j_manager: Neo4jManager):
@@ -62,74 +71,59 @@ class Text2CypherRetriever:
                 return match
 
         return normalized
-
-    def _extract_and_normalize_species(self, question: str) -> str:
+    
+    def _extract_species_from_question(self, question: str) -> List[str]:
         """
-        Detecta y normaliza TODOS los nombres de especies en la pregunta,
-        manteniendo el resto de la pregunta intacta.
+        Usa un LLM para identificar las especies mencionadas en la pregunta
+        y las normaliza al formato de la BD.
         """
-        print(f"Original question: {question}")
-        sorted_species = sorted(self._known_species, key=len, reverse=True)
 
-        matched_positions = set()
-        replacements = {}  # {(start, end): normalized_species}
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a zoology expert. Your only task is to identify animal species "
+                    "mentioned in the user's question and return them as a JSON list. "
+                    "Return an empty list if no species are mentioned. "
+                    "Do NOT include general terms like 'animal' or 'species'. "
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Identify all animal species mentioned in this question: {question}"
+            }
+        ]
 
-        lower_q = question.lower()
+        result: Species = self.client.structured_output_with_chat(
+            messages=messages,
+            schema=Species,
+            temperature=0.0
+        )
 
-        # 1. Coincidencias directas, marcando posiciones para no solapar
-        for species in sorted_species:
-            lower_s = species.lower()
-            idx = lower_q.find(lower_s)
-            if idx != -1 and idx not in matched_positions:
-                replacements[(idx, idx + len(lower_s))] = species
-                matched_positions.update(range(idx, idx + len(lower_s)))
+        # Normalizar cada especie identificada al formato de la BD
+        return result.species
+    
+    def _normalize_species_in_question(self, question: str) -> str:
+        """
+        Reemplaza los nombres de especies en la pregunta por sus equivalentes normalizados.
+        Esto ayuda al LLM a generar Cypher con los nombres correctos.
+        """
+        species_in_question = self._extract_species_from_question(question)
+        normalized_species = [self.normalize_species_name(s) for s in species_in_question]
+        normalized_question = question
 
-        print(f"Replacements found: {replacements}")
-        # 2. Levenshtein para zonas no matcheadas (bigramas y trigramas)
-        words = question.split()
-        word_positions = []
-        pos = 0
-        for word in words:
-            idx = question.find(word, pos)
-            word_positions.append((idx, idx + len(word), word))
-            pos = idx + len(word)
+        for raw, normalized in zip(species_in_question, normalized_species):
+            if raw != normalized:
+                normalized_question = normalized_question.replace(raw, normalized)
 
-        for i in range(len(words)):
-            for n in (3, 2):
-                if i + n <= len(words):
-                    chunk_words = words[i:i+n]
-                    start = word_positions[i][0]
-                    end = word_positions[i+n-1][1]
-                    if any(p in matched_positions for p in range(start, end)):
-                        continue
-                    chunk = " ".join(chunk_words).strip("?.,!")
-                    normalized = self.normalize_species_name(chunk)
-                    if normalized != chunk.title():
-                        replacements[(start, end)] = normalized
-                        matched_positions.update(range(start, end))
-                        break
+        return normalized_question
 
-        # 3. Reconstruir la pregunta reemplazando solo las posiciones matcheadas
-        if not replacements:
-            return question
-
-        result = []
-        prev = 0
-        for start, end in sorted(replacements.keys()):
-            result.append(question[prev:start])      # texto original intacto
-            result.append(replacements[(start, end)]) # especie normalizada
-            prev = end
-        result.append(question[prev:])               # resto de la pregunta
-
-        result = "".join(result)
-        print(f"Normalized question: {result}")
-        return "".join(result)
 
     def generate_cypher(self, question: str) -> str:
         """Genera una query Cypher a partir de una pregunta en lenguaje natural."""
 
         # Normalizar especies antes de pasarle la pregunta al LLM
-        question = self._extract_and_normalize_species(question)
+        question = self._normalize_species_in_question(question)
 
         schema = self.neo4j.get_schema()
         schema_str = self.neo4j.format_schema(schema)

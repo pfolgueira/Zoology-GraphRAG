@@ -27,6 +27,11 @@ class RetrieverTools:
             "description": description
         }
 
+    def _format_graph_context(self, tool_name: str, query: str, results: List[Dict]) -> List[str]:
+        header = f"[{tool_name} - {query}]"
+        rows = "\n".join(str(r) for r in results)
+        return [f"{header}\n{rows}"]
+
     _GREETING_RESPONSES = [
         # 🦉 El Búho Sabiondo
         ("Hoot hoot! 🦉 I am a highly intellectual knowledge assistant perched at the top of the animal kingdom. "
@@ -133,7 +138,7 @@ class RetrieverTools:
                             "(e.g., 'how many animals...', 'list all species in the family X', 'what is the exact diet of Y'). "
                             "DO NOT use this tool for requesting long-form text, general explanations, or descriptive paragraphs.",
                 "parameters": {
-                    "query": "The user's EXACT question in natural language, to be translated into Cypher."
+                    "query": "The user's EXACT question in natural language."
                 }
             },
             {
@@ -146,6 +151,7 @@ class RetrieverTools:
                     "DO NOT use this tool for partial queries, comparisons, aggregations, or general habitat/diet questions."
                 ),
                 "parameters": {
+                    "query": "The user's EXACT question in natural language.",
                     "species_name": "The name of the animal species to retrieve the full profile for (e.g., 'Lion', 'Tiger')."
                 }
             },
@@ -159,6 +165,7 @@ class RetrieverTools:
                     "DO NOT use for general habitat questions or non-conservation queries."
                 ),
                 "parameters": {
+                    "query": "The user's EXACT question in natural language.",
                     "environment_name": (
                         "The environment type normalized to one of these exact values: "
                         "'Aquatic', "
@@ -179,6 +186,7 @@ class RetrieverTools:
                     "DO NOT use if the user only asks one direction (use text2cypher instead)."
                 ),
                 "parameters": {
+                    "query": "The user's EXACT question in natural language.",
                     "species_name": "The name of the animal species to retrieve the predator-prey chain for (e.g., 'Lion', 'Zebra')."
                 }
             },
@@ -192,6 +200,7 @@ class RetrieverTools:
                     "DO NOT use for questions about a specific species or general social behavior descriptions."
                 ),
                 "parameters": {
+                    "query": "The user's EXACT question in natural language.",
                     "class_name": (
                         "The animal class normalized to one of these exact values: "
                         "'Mammal', 'Reptile', 'Bird', 'Fish', 'Amphibian'. "
@@ -248,7 +257,7 @@ class RetrieverTools:
                 "tool": tool_name,
                 "cypher": cypher,
                 "results": results,
-                "context": [str(r) for r in results]
+                "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
         
         if tool_name == "predefined_endangered_by_environment":
@@ -260,21 +269,21 @@ class RetrieverTools:
                 "tool": tool_name,
                 "cypher": cypher,
                 "results": results,
-                "context": [str(r) for r in results]
+                "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
         
         if tool_name == "predefined_predator_prey_chain":
             cypher, results = self.manual_retriever.retrieve(
-                query_category="predator_prey_chain",  # fijo, lo determina el tool_name
+                query_category="predator_prey_chain",
                 species_name=kwargs.get("species_name", "").title(),
             )
             return {
                 "tool": tool_name,
                 "cypher": cypher,
                 "results": results,
-                "context": [str(r) for r in results]
+                "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
-        
+                
         if tool_name == "predefined_social_structure_by_class":
             cypher, results = self.manual_retriever.retrieve(
                 query_category="social_structure_by_class",  # fijo, lo determina el tool_name
@@ -284,7 +293,7 @@ class RetrieverTools:
                 "tool": tool_name,
                 "cypher": cypher,
                 "results": results,
-                "context": [str(r) for r in results]
+                "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
 
         elif tool_name == "hybrid_search":
@@ -313,7 +322,7 @@ class RetrieverTools:
                 "tool": tool_name,
                 "cypher": cypher,
                 "results": results,
-                "context": [str(r) for r in results]
+                "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
 
         elif tool_name in self.custom_tools:

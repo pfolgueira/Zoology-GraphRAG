@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
+from ..llm.gemini_client import GeminiClient
 from ..llm.ollama_client import OllamaClient
 from ..llm.groq_client import GroqClient
 
@@ -21,7 +22,7 @@ class AnswerCritique(BaseModel):
 
 class AnswerCritic:
     def __init__(self):
-        self.client = GroqClient()
+        self.client = GeminiClient()
 
     def critique(self, question: str, context: List[str], answer: str) -> Dict[str, Any]:
         """
