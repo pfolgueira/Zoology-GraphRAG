@@ -4,6 +4,7 @@ from ..retrieval.manual_retriever import ManualRetriever
 from ..retrieval.hybrid_retriever import HybridRetriever
 from ..retrieval.text2cypher import Text2CypherRetriever
 from ..graph.neo4j_manager import Neo4jManager
+from ..agents.multi_hop_planer import MultiHopPlanner
 
 import random
 
@@ -18,6 +19,7 @@ class RetrieverTools:
         self.hybrid_retriever = HybridRetriever(neo4j_manager)
         self.text2cypher = Text2CypherRetriever(neo4j_manager)
         self.manual_retriever = ManualRetriever(neo4j_manager)
+        self.multi_hop_planner = MultiHopPlanner(neo4j_manager, self.text2cypher)
         self.custom_tools: Dict[str, ToolData] = {}
 
     def register_custom_tool(self, name: str, function: Callable, description: str):
@@ -126,7 +128,8 @@ class RetrieverTools:
                             "It performs a combined semantic and keyword search with reranking. "
                             "PRIORITIZE THIS TOOL when the user asks for general information, broad descriptions, explanations, or curiosities about animals "
                             "(e.g., 'describe the habitat of...', 'explain how X hunts'). "
-                            "DO NOT use this tool for counting, aggregations, or exact property filtering.",
+                            "DO NOT use this tool for counting, aggregations, or exact property filtering."
+                            "DO NOT use this tool if the query is a multi-part question that requires both finding specific entities and extracting their general traits (use 'complex_query    ' instead).",
                 "parameters": {
                     "query": "The search query in natural language, optimized for document retrieval."
                 }
@@ -136,10 +139,24 @@ class RetrieverTools:
                 "description": "Use this tool to query the structured knowledge graph directly. "
                             "PRIORITIZE THIS TOOL when the query requires precise data points, structured relationship traversals, exact property matching, or aggregations "
                             "(e.g., 'how many animals...', 'list all species in the family X', 'what is the exact diet of Y'). "
-                            "DO NOT use this tool for requesting long-form text, general explanations, or descriptive paragraphs.",
+                            "DO NOT use this tool for requesting long-form text, general explanations, or descriptive paragraphs. "
+                            "DO NOT use this tool if the query is a multi-part question that requires both finding specific entities and extracting their general traits (use 'complex_query' instead)."
+                            ,
                 "parameters": {
                     "query": "The user's EXACT question in natural language."
                 }
+            },
+            {
+                "name": "complex_query",
+                "description": "Use this tool ONLY for complex, multi-part, or hybrid questions that require BOTH structured graph filtering "
+                               "AND unstructured semantic retrieval. PRIORITIZE THIS TOOL when the user asks to compare different groups, asks for "
+                               "explanations about a specific filtered subset of entities, or when the query clearly requires multiple reasoning steps "
+                               "(e.g., 'Of the animals that live in the Savannah, what are their defense strategies?', 'Of the oviparous animals, in what species is "
+                               "the male in charge of taking care of the baby?'). DO NOT use this tool for simple, single-hop questions. "
+                               "DO NOT use this tool if the user asks multiple independent questions that do not depend on each other's context. "
+                               "This tool MUST be called alone and NEVER combined with other tool calls." 
+                               ,
+                "parameters": {}
             },
             {
                 "name": "predefined_species_full_profile",
@@ -296,7 +313,7 @@ class RetrieverTools:
                 "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
 
-        elif tool_name == "hybrid_search":
+        if tool_name == "hybrid_search":
             results = self.hybrid_retriever.retrieve(kwargs.get("query", ""))
             return {
                 "tool": tool_name,
@@ -304,7 +321,7 @@ class RetrieverTools:
                 "context": [r["text"] for r in results]
             }
 
-        elif tool_name == "text2cypher":
+        if tool_name == "text2cypher":
             cypher, results = self.text2cypher.retrieve(kwargs.get("query", ""))
 
             # Fallback a hybrid_search si text2cypher no devuelve resultados
@@ -324,8 +341,11 @@ class RetrieverTools:
                 "results": results,
                 "context": self._format_graph_context(tool_name, kwargs.get("query", ""), results)
             }
+        
+        if tool_name == "complex_query":
+            return self.multi_hop_planner.plan_and_execute(kwargs.get("question", ""))
 
-        elif tool_name in self.custom_tools:
+        if tool_name in self.custom_tools:
             function = self.custom_tools[tool_name]["function"]
             results = function(**kwargs)
             return {

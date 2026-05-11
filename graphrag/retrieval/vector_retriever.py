@@ -23,8 +23,7 @@ class VectorRetriever:
     def retrieve(self, query: str, top_k: int = None) -> List[Dict[str, Any]]:
         """
         Recupera chunks relevantes en 2 etapas:
-        1) vector search sobre preguntas hipotéticas,
-        2) reranking con bge-reranker-v2-m3 vía Ollama.
+        1) vector search sobre preguntas hipotéticas
         """
         top_k = top_k or self.settings.top_k_candidates
 
@@ -86,6 +85,38 @@ class VectorRetriever:
 
         results = self.neo4j.execute_query(cypher_query, {
             "query_embedding": query_embedding,
+            "top_k": top_k
+        })
+
+        return results
+
+    def retrieve_filtered_by_entity(
+            self, 
+            query_embedding: List[float], 
+            entity_name: str, 
+            top_k: int = 2
+    ) -> List[Dict[str, Any]]:
+        """
+        Recupera los chunks más relevantes EXCLUSIVAMENTE para una especie concreta.
+        Realiza un cálculo matemático exacto (fuerza bruta) solo sobre el subgrafo de la especie,
+        garantizando un 100% de recall sin depender del índice aproximado global.
+        """
+        # La consulta busca los chunks de la especie y calcula la similitud vectorial al vuelo
+        cypher_query = """
+        MATCH (chunk:Chunk)-[:HAS_ENTITY]->(s:Species {name: $entity_name})
+        WHERE chunk.embedding IS NOT NULL
+        WITH chunk, vector.similarity.cosine(chunk.embedding, $query_embedding) AS score
+        RETURN chunk.text AS text,
+               chunk.id AS chunk_id,
+               score,
+               $entity_name AS entity_source
+        ORDER BY score DESC
+        LIMIT $top_k
+        """
+
+        results = self.neo4j.execute_query(cypher_query, {
+            "query_embedding": query_embedding,
+            "entity_name": entity_name,
             "top_k": top_k
         })
 

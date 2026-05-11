@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 TOOL_REQUIRED_PARAMS: Dict[str, List[str]] = {
     "hybrid_search":                  ["query"],
     "text2cypher":                    ["query"],
+    "complex_query":                  [],
     "predefined_species_full_profile": ["query", "species_name"],
     "predefined_endangered_by_environment": ["query", "environment_name"],
     "predefined_predator_prey_chain": ["query", "species_name"],
@@ -46,6 +47,7 @@ class ToolCall(BaseModel):
         "predefined_endangered_by_environment",
         "predefined_predator_prey_chain",
         "predefined_social_structure_by_class",
+        "complex_query",
         "hybrid_search",
         "text2cypher",
         "greeting",
@@ -141,6 +143,14 @@ ROUTING RULES — Apply strictly in the following order:
 - ALWAYS prioritize these over text2cypher or hybrid_search when the intent clearly matches.
 - Each predefined tool has its own description and required parameters detailed in the tools list above.
 
+5. complex_query
+- Use ONLY for complex, multi-hop questions that require BOTH structured graph filtering AND unstructured semantic retrieval in a sequential, dependent manner.
+- PRIORITIZE when the user asks to compare different groups of species, or asks for explanations about a specific filtered subset of entities.
+- Examples: "Of the animals that live in the Savannah, what are their defense strategies?", "Compare the diets of felines in Africa vs Asia."
+- DO NOT use for simple, single-hop questions.
+- DO NOT use if the user asks multiple independent questions.
+- NEVER combine with other tools.
+
 5. text2cypher
 - Use for extracting specific factual data, structured relationships, and complex analytical questions.
 - Good for: "What do X eat/hunt?", "Where do X live?", "What is the speed/weight/lifespan of X?", "How many...", "Which animals...", "List all...".
@@ -198,6 +208,11 @@ Respond ONLY with a JSON object matching the schema, without any additional text
 
         for tc in decision.tool_calls:
             kwargs = tc.parameters.model_dump(exclude_none=True)
+            
+            # Si se requiere multi-hop reasoning le pasamos la pregunta original como argumento a la herramienta
+            if tc.tool == "complex_query":
+                kwargs["question"] = question
+                
             result = self.tools.execute_tool(tc.tool, **kwargs)
 
             combined_results.extend(result.get("results", []))
