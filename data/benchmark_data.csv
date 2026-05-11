@@ -8,6 +8,9 @@ Can you give me a recipe for paella?;RETURN 'Umm... moo? 🐄 Sorry, this questi
 What does the african elephant eat?;MATCH (s:Species {name: 'Elephant'}) OPTIONAL MATCH (s)-[:PREYS_ON]->(prey:Species) OPTIONAL MATCH (s)-[:FEEDS_ON]->(food:FoodSource) RETURN s.name AS species, collect(DISTINCT prey.name) AS preys_on, collect(DISTINCT food.type) AS feeds_on;text2cypher
 Where does the emperor penguin live?;MATCH (s:Species {name: 'Penguin'}) OPTIONAL MATCH (s)-[:FOUND_IN]->(loc:Location) OPTIONAL MATCH (s)-[:INHABITS]->(hab:Habitat) RETURN s.name AS species, collect(DISTINCT loc.type) AS locations, collect(DISTINCT hab.type) AS habitats;text2cypher
 Is the Earthworm a vertebrate or invertebrate?;MATCH (s:Species {name: 'Earthworm'})-[:HAS_SKELETAL_STRUCTURE]->(ss:SkeletalStructure) RETURN s.name AS species, ss.type AS skeletal_structure;text2cypher
+Is the Cat a vertebrate or invertebrate?;RETURN 'This information is not in the knowledge base.' AS ground_truth;text2cypher
+How fast can a blobfish swim?;RETURN 'This information is not in the knowledge base.' AS ground_truth;text2cypher
+Can a spider sing?;RETURN 'Umm... moo? 🐄 Sorry, this question is way outside my pasture. I am designed to chew the cud exclusively about zoology and animal biology. If you have a question about the animal world, I am ready to help! Otherwise, I'm just going back to eating grass. 🌱' AS ground_truth;out_of_scope
 How fast can a spotted cheetah run?;MATCH (s:Species {name: 'Cheetah'}) RETURN s.name AS species, s.top_speed_kmh AS top_speed_kmh;text2cypher
 Which animal class has the most endangered species?;MATCH (s:Species)-[:BELONGS_TO_CLASS]->(c:AnimalClass) MATCH (s)-[:HAS_CONSERVATION_STATUS]->(cs:ConservationStatus) WHERE cs.type IN ['CR (Critically Endangered)', 'EN (Endangered)'] RETURN c.type AS class, count(s) AS endangered_count ORDER BY endangered_count DESC LIMIT 1;text2cypher
 How many species in the database are nocturnal?;MATCH (s:Species)-[:HAS_ACTIVITY_CYCLE]->(ac:ActivityCycle {type: 'Nocturnal'}) RETURN count(s) AS nocturnal_species;text2cypher
@@ -36,3 +39,6 @@ How does the mating and reproductive process of earthworms work in detail?;MATCH
 How do zebras look like?;MATCH (c:Chunk) WHERE c.Animal = 'Zebra' AND c.Section = "Anatomy and Appearance" RETURN coalesce(c.text, 'This information is not in the knowledge base.') AS ground_truth; hybrid_search
 What are the differences between Alpaca and Llama?;MATCH (c:Chunk) WHERE c.Animal = 'Alpaca' AND c.Subsection = "Alpaca Vs. Llama" RETURN coalesce(c.text, 'This information is not in the knowledge base.') AS ground_truth;hybrid_search
 What can you tell me about Rhinoceros horns?;MATCH (c:Chunk) WHERE c.Animal = 'Rhinoceros' AND c.Section = "Rhino horn" RETURN coalesce(c.text, 'This information is not in the knowledge base.') AS ground_truth LIMIT 1;hybrid_search
+Why does the Toucan have such a large and colorful beak?;RETURN 'This information is not in the knowledge base.' AS ground_truth;hybrid_search
+Why do flamingos stand on one leg?;RETURN 'This information is not in the knowledge base.' AS ground_truth;hybrid_search
+Why do praying mantises have such long forelegs?;RETURN 'This information is not in the knowledge base.' AS ground_truth;hybrid_search

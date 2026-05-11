@@ -25,4 +25,7 @@ dependencies = [
     "pandas>=3.0.2",
     "groq>=1.2.0",
     "rapidfuzz>=3.14.5",
+    "streamlit>=1.57.0",
+    "torchvision>=0.26.0",
+    "fastapi>=0.136.1",
 ]
