@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import backgroundImg from './assets/01-background.png';
 
 // Sub-componente para renderizar cada mensaje
 const MessageBubble = ({ message }) => {
@@ -22,9 +23,36 @@ const MessageBubble = ({ message }) => {
 };
 
 export default function ChatInterface() {
-  const initialMessage = { role: 'assistant', content: '¡Hola! Soy tu Asistente Virtual. ¿En qué puedo ayudarte hoy?' };
+  const greetingOptions = [
+    {
+      text: "Greetings! I'm your Virtual Assistant. Don't mind the muscles; I only use them to carry the heavy weight of our zoology database. Ready to swing into some research, or should we go grab some bananas first?",
+      emoji: "🦍"
+    },
+    {
+      text: "Hi there! I was blending in with the background... did you see me? I'm an expert at camouflaging myself within thousands of documents to find exactly what you need. Ask away before I change colors again!",
+      emoji: "🦎"
+    },
+    {
+      text: "Hello! The view from up here is amazing—I can see the entire knowledge graph clearly. I've got the long neck needed to reach even the highest, most hidden data. What's sparking your curiosity today?",
+      emoji: "🦒"
+    },
+    {
+      text: "Welcome to the pride! I'm the one in charge of this data savanna. Don't worry, I've already had breakfast, so you can ask me anything without fear. Shall we start our expedition?",
+      emoji: "🦁"
+    },
+    {
+      text: "Splash! I'm your Virtual Assistant. I've just surfaced from the deep ocean of data to help you navigate. I'm a natural at finding 'current' information, so don't be shy—dive in with your questions!",
+      emoji: "🐬"
+    }
+  ];
   
-  const [messages, setMessages] = useState([initialMessage]);
+  const [messages, setMessages] = useState([]);
+  const [greetingData, setGreetingData] = useState(greetingOptions[0]);
+  
+  useEffect(() => {
+    setGreetingData(greetingOptions[Math.floor(Math.random() * greetingOptions.length)]);
+  }, []);
+
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [requestTimestamps, setRequestTimestamps] = useState([]);
@@ -57,7 +85,8 @@ export default function ChatInterface() {
 // --- FUNCIÓN ACTUALIZADA: REINICIAR CONVERSACIÓN ---
   const handleReset = async () => {
     // 1. Limpiar estado local primero para que se sienta rápido
-    setMessages([initialMessage]);
+    setMessages([]);
+    setGreetingData(greetingOptions[Math.floor(Math.random() * greetingOptions.length)]);
     setInputValue('');
     setIsLoading(false);
     setRequestTimestamps([]);
@@ -130,7 +159,7 @@ export default function ChatInterface() {
       // Mostrar un mensaje de error como si fuera el asistente para no romper el flujo
       setMessages(prev => [
         ...prev, 
-        { role: 'assistant', content: "Hubo un problema de conexión con el servidor. Asegúrate de que el backend está corriendo." }
+        { role: 'assistant', content: "There was a connection problem with the server. Please make sure the backend is running." }
       ]);
     } finally {
       setIsLoading(false);
@@ -144,23 +173,41 @@ export default function ChatInterface() {
     }
   };
 
+  const animalEmojis = ['🦁', '🐯', '🐼', '🐨', '🐸', '🐢', '🦖', '🐬', '🦘', '🦥', '🦩', '🦛'];
+  const [animalEmoji, setAnimalEmoji] = useState('');
+
+  useEffect(() => {
+    const randomEmoji = animalEmojis[Math.floor(Math.random() * animalEmojis.length)];
+    setAnimalEmoji(randomEmoji);
+  }, []);
+
   return (
-    <div className="flex flex-col h-screen w-full bg-white overflow-hidden">
+    <div className="flex flex-col h-screen w-full overflow-hidden relative">
+      {/* Imagen de fondo global */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <img src={backgroundImg} alt="background" className="w-full h-full object-cover" />
+      </div>
+
       {/* Cabecera */}
-      <header className="flex justify-between items-center px-6 py-4 bg-white border-b border-gray-200 shrink-0 z-10">
-        <h1 className="text-xl font-bold text-gray-800 tracking-tight">
-          Asistente Virtual
+      <header className="flex justify-center items-center px-6 py-4 bg-white/10 backdrop-blur-sm border-b border-gray-200 shrink-0 z-10 relative">
+        <h1 className="text-3xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
+          {animalEmoji} Zoology Assistant
         </h1>
-        <button 
-          onClick={handleReset}
-          className="px-4 py-2 text-sm font-medium text-gray-600 bg-transparent border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200"
-        >
-          Reiniciar Conversación
-        </button>
       </header>
 
       {/* Zona de Chat */}
-      <main className="flex-1 overflow-y-auto w-full p-4 sm:p-6 bg-gray-50/50">
+      <main className="flex-1 overflow-y-auto w-full p-4 sm:p-6 relative z-10 bg-transparent flex flex-col">
+        {messages.length === 0 && (
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="max-w-2xl bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-lg border border-gray-200 text-center flex flex-col items-center">
+              <span className="text-7xl mb-6">{greetingData.emoji}</span>
+              <p className="text-lg md:text-xl text-gray-700 italic leading-relaxed font-medium">
+                "{greetingData.text}"
+              </p>
+            </div>
+          </div>
+        )}
+        
         <div className="max-w-4xl mx-auto w-full">
           {messages.map((msg, index) => (
             <MessageBubble key={index} message={msg} />
@@ -181,7 +228,7 @@ export default function ChatInterface() {
           {rateLimitError && (
             <div className="flex justify-center mb-4">
               <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-medium shadow-sm border border-red-100">
-                Has superado el límite de peticiones (15/minuto). Por favor, espera un momento.
+                You've exceeded the request limit (15/min). Please wait a moment.
               </div>
             </div>
           )}
@@ -191,15 +238,28 @@ export default function ChatInterface() {
       </main>
 
       {/* Zona de Entrada */}
-      <footer className="shrink-0 p-4 bg-white">
+      <footer className="shrink-0 p-4 bg-white/10 backdrop-blur-sm z-10 relative border-t border-gray-200/50">
         <div className="max-w-4xl mx-auto w-full relative flex items-end gap-2">
+          {/* Reset button */}
+          <button
+            onClick={handleReset}
+            title="Restart conversation"
+            className="flex shrink-0 items-center justify-center p-3 h-[52px] w-[52px] sm:w-auto sm:px-4 bg-white text-gray-600 rounded-xl shadow-sm hover:bg-gray-50 border border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-[#2FA084]"
+            aria-label="Restart conversation"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 sm:mr-2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span className="hidden sm:inline font-medium text-sm">Restart</span>
+          </button>
+
           <textarea
             ref={textareaRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
-            placeholder="Escribe tu mensaje aquí..."
+            placeholder="Type your message here..."
             className="flex-1 min-h-[52px] resize-none overflow-hidden rounded-xl border border-gray-300 bg-white py-3 px-4 text-gray-800 shadow-sm focus:border-[#2FA084] focus:outline-none focus:ring-1 focus:ring-[#2FA084] disabled:bg-[#EEEEEE] disabled:text-gray-500"
             rows={1}
           />
@@ -207,7 +267,7 @@ export default function ChatInterface() {
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
             className="flex shrink-0 items-center justify-center p-3 h-[52px] w-[52px] bg-[#2FA084] text-white rounded-xl shadow-sm hover:bg-[#1F6F5F] transition-colors disabled:bg-[#6FCF97] disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#2FA084] focus:ring-offset-2"
-            aria-label="Enviar mensaje"
+            aria-label="Send message"
           >
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -220,7 +280,7 @@ export default function ChatInterface() {
           </button>
         </div>
         <p className="text-center text-xs text-gray-400 mt-2">
-          Presiona Enter para enviar, Shift + Enter para saltar de línea.
+          Press Enter to send, Shift + Enter for newline.
         </p>
       </footer>
     </div>
