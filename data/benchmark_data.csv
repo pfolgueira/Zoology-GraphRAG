@@ -42,3 +42,6 @@ What can you tell me about Rhinoceros horns?;MATCH (c:Chunk) WHERE c.Animal = 'R
 Why does the Toucan have such a large and colorful beak?;RETURN 'This information is not in the knowledge base.' AS ground_truth;hybrid_search
 Why do flamingos stand on one leg?;RETURN 'This information is not in the knowledge base.' AS ground_truth;hybrid_search
 Why do praying mantises have such long forelegs?;RETURN 'This information is not in the knowledge base.' AS ground_truth;hybrid_search
+Of the species that inhabit the Savannah, how is their appearance?;MATCH (c:Chunk) WHERE (c.Animal = 'Giraffe' AND c.Section = "Anatomy and Appearance") OR (c.Animal = 'Elephant' AND c.Section = "Appearance") OR (c.Animal = 'Donkey' AND c.Section = "Appearance and Behavior") WITH c.Animal AS animal, collect(c)[0..2] AS top_chunks UNWIND top_chunks AS c RETURN coalesce(c.text, 'This information is not in the knowledge base.') AS ground_truth;complex_search
+Describe the diet of the animals that weigh more than 50 kilograms;;complex_search
+Of oviparous animals, in which species is the male responsible for taking care of the offspring?;;complex_search
