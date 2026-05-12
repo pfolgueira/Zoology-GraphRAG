@@ -7,7 +7,6 @@ from .answer_critic import AnswerCritic
 from ..llm.groq_client import GroqClient
 from ..llm.gemini_client import GeminiClient
 
-
 class AgenticRAG:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
@@ -16,6 +15,8 @@ class AgenticRAG:
         self.router = RetrieverRouter(self.tools)
         self.critic = AnswerCritic()
         self.conversation_history = []
+        self.add_text2cypher_examples()
+        self.add_terminology_maps()
 
     def answer(self, question: str, max_iterations: int = 2) -> Dict[str, Any]:
         """
@@ -137,10 +138,28 @@ STRICT RULES — follow all of them:
         """Reinicia el historial de conversación."""
         self.conversation_history = []
 
-    def add_text2cypher_example(self, question: str, cypher: str):
-        """Agrega un ejemplo al prompt de text2cypher."""
-        self.router.tools.text2cypher.add_few_shot_example(question, cypher)
+    def add_text2cypher_examples(self):
+        """Agrega ejemplos al prompt de text2cypher."""
+        text2cypher_examples = [
+            ("How many Mammal species are there?", "MATCH (s:Species)-[:BELONGS_TO_CLASS]->(c:AnimalClass {type: 'Mammal'}) RETURN count(s) AS totalMammals"),
+            ("What is the top speed and maximum weight of a Lion?", "MATCH (s:Species {name: 'Lion'}) RETURN s.top_speed_kmh, s.weight_max_kg"),
+            ("What type of diet do tigers have and what do they prey on?", "MATCH (s:Species {name: 'Tiger'})-[:HAS_DIET_TYPE]->(d:DietType), (s)-[:PREYS_ON]->(prey:Species) RETURN d.type, prey.name"),
+            ("Which animals have a lifespan greater than 50 years?", "MATCH (s:Species) WHERE s.lifespan_years > 50 RETURN s.name, s.lifespan_years"),
+            ("Where do whales migrate to in the winter?", "MATCH (s:Species {name: 'Whale'})-[m:MIGRATES_TO {season: 'Winter'}]->(l:Location) RETURN l.type"),
+            ("What does a chimpanzee eat?", "MATCH (s:Species {name: 'Chimpanzee'}) OPTIONAL MATCH (s)-[:PREYS_ON]->(prey:Species) OPTIONAL MATCH (s)-[:FEEDS_ON]->(food:FoodSource) RETURN s.name AS species, collect(DISTINCT prey.name) AS preys_on, collect(DISTINCT food.type) AS feeds_on"),
+            ("In which countries or regions are kangaroos found?", "MATCH (s:Species {name: 'Kangaroo'})-[:FOUND_IN]->(l:Location) RETURN l.type"),
+            ("What kind of ecosystem or biome does the polar bear inhabit?", "MATCH (s:Species {name: 'Polar Bear'})-[:INHABITS]->(h:Habitat) RETURN h.type")
+        ]
+        for question, cypher in text2cypher_examples:
+            self.router.tools.text2cypher.add_few_shot_example(question, cypher)
 
-    def add_terminology_map(self, term: str, description: str):
-        """Agrega un término al mapa de terminología."""
-        self.router.tools.text2cypher.add_terminology_map(term, description)
+    def add_terminology_maps(self, term: str, description: str):
+        """Agrega términos al mapa de terminología."""
+        terminology_maps = [
+            ("animal, creature, species", "Refers to the node with label (:Species)"),
+            ("what does X eat, what do X eat, diet of X, food of X. When asking what an animal eats, check BOTH relationships: ", "[:PREYS_ON]->(:Species) for animal prey AND [:FEEDS_ON]->(:FoodSource) for non-animal food sources. Use OPTIONAL MATCH for both and return all results."),
+            ("country, continent, geographic region, area, located in", "Use the relationship [:FOUND_IN]->(:Location) to refer to specific geographical and political places."),
+            ("biome, ecosystem, type of environment, terrain, inhabits", "Use the relationship [:INHABITS]->(:Habitat) to refer to the natural biome or habitat type.")    
+        ]
+        for terms, explanation in terminology_maps:
+            self.router.tools.text2cypher.add_terminology_map(term, explanation)
