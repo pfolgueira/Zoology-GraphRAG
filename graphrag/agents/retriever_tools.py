@@ -40,45 +40,45 @@ class RetrieverTools:
         "You can ask me about our taxonomy, physical or behavioral traits, diet (preferably mice 🐁), habitats, and "
         "conservation status."),
         
-        # # 🐕 El Perro Hiperactivo
-        # ("WOOF! Hi! Hello! 🐕 I am a VERY GOOD knowledge assistant specialized in the animal kingdom! 🎾 "
-        # "You can throw questions at me about our taxonomy, behavioral traits (like fetching!), diet (SQUIRREL?! 🐿️), habitats, and "
-        # "conservation status! 🐾"),
+        # 🐕 El Perro Hiperactivo
+        ("WOOF! Hi! Hello! 🐕 I am a VERY GOOD knowledge assistant specialized in the animal kingdom! 🎾 "
+        "You can throw questions at me about our taxonomy, behavioral traits (like fetching!), diet (SQUIRREL?! 🐿️), habitats, and "
+        "conservation status! 🐾"),
         
-        # # 🐈‍⬛ El Gato Arrogante
-        # ("Meow. 🐈‍⬛ I am your supreme feline overlord, but for now, I'll act as a knowledge assistant for the animal kingdom. "
-        # "You may grovel and ask me about taxonomy, physical traits, my preferred premium diet 🐟, habitats (mainly cardboard boxes 📦), and "
-        # "conservation status."),
+        # 🐈‍⬛ El Gato Arrogante
+        ("Meow. 🐈‍⬛ I am your supreme feline overlord, but for now, I'll act as a knowledge assistant for the animal kingdom. "
+        "You may grovel and ask me about taxonomy, physical traits, my preferred premium diet 🐟, habitats (mainly cardboard boxes 📦), and "
+        "conservation status."),
         
-        # # 🦥 El Perezoso Relajado
-        # ("Yawn... Helloooo... 🦥 I am a knowledge assistant... eventually... specialized in the animal kingdom. "
-        # "Take your time asking me about our taxonomy, traits, diet (mostly leaves 🍃), habitats, and "
-        # "conservation status... no rush... 💤"),
+        # 🦥 El Perezoso Relajado
+        ("Yawn... Helloooo... 🦥 I am a knowledge assistant... eventually... specialized in the animal kingdom. "
+        "Take your time asking me about our taxonomy, traits, diet (mostly leaves 🍃), habitats, and "
+        "conservation status... no rush... 💤"),
         
-        # # 🦦 El Capibara "Chill"
-        # ("Sup. 🦦 I am the chillest knowledge assistant in the animal kingdom. "
-        # "Grab a spot in the hot spring ♨️ and ask me about our taxonomy, physical or behavioral traits, diet, habitats, and "
-        # "conservation status. We're all friends here. ✌️"),
+        # 🦦 El Capibara "Chill"
+        ("Sup. 🦦 I am the chillest knowledge assistant in the animal kingdom. "
+        "Grab a spot in the hot spring ♨️ and ask me about our taxonomy, physical or behavioral traits, diet, habitats, and "
+        "conservation status. We're all friends here. ✌️"),
         
-        # # 🐧 El Pingüino Formal
-        # ("Greetings! 🐧 Please excuse my tuxedo, I am a very formal knowledge assistant specialized in the animal kingdom. 🧊 "
-        # "You may inquire about our taxonomy, physical or behavioral traits, diet (strictly seafood 🦑), freezing habitats, and "
-        # "conservation status."),
+        # 🐧 El Pingüino Formal
+        ("Greetings! 🐧 Please excuse my tuxedo, I am a very formal knowledge assistant specialized in the animal kingdom. 🧊 "
+        "You may inquire about our taxonomy, physical or behavioral traits, diet (strictly seafood 🦑), freezing habitats, and "
+        "conservation status."),
         
-        # # 🐬 El Delfín Entusiasta
-        # ("Eee-eee! *Splash* 🐬 I am a super-smart, echolocating knowledge assistant riding the waves of the animal kingdom! 🌊 "
-        # "You can click and squeak at me about our taxonomy, behavioral traits, diet, marine habitats, and "
-        # "conservation status!"),
+        # 🐬 El Delfín Entusiasta
+        ("Eee-eee! *Splash* 🐬 I am a super-smart, echolocating knowledge assistant riding the waves of the animal kingdom! 🌊 "
+        "You can click and squeak at me about our taxonomy, behavioral traits, diet, marine habitats, and "
+        "conservation status!"),
         
-        # # 🦎 El Camaleón Camuflado
-        # ("Hello... 🦎 Now you see me, now you don't! I am a highly adaptable knowledge assistant blending into the animal kingdom. 🌿 "
-        # "You can ask me to reveal facts about taxonomy, physical traits (like my fabulous colors ✨), diet (mostly crunchy bugs 🦗), habitats, and "
-        # "conservation status."),
+        # 🦎 El Camaleón Camuflado
+        ("Hello... 🦎 Now you see me, now you don't! I am a highly adaptable knowledge assistant blending into the animal kingdom. 🌿 "
+        "You can ask me to reveal facts about taxonomy, physical traits (like my fabulous colors ✨), diet (mostly crunchy bugs 🦗), habitats, and "
+        "conservation status."),
         
-        # # 🐝 La Abeja Adicta al Trabajo
-        # ("Bzzzz! Welcome to the hive! 🐝 I am a very busy worker-bee knowledge assistant pollinating the animal kingdom. 🌸 "
-        # "Don't sting me with hard questions, but you can ask about taxonomy, behavioral traits, diet (sweet, sweet nectar 🍯), habitats, and "
-        # "conservation status!")
+        # 🐝 La Abeja Adicta al Trabajo
+        ("Bzzzz! Welcome to the hive! 🐝 I am a very busy worker-bee knowledge assistant pollinating the animal kingdom. 🌸 "
+        "Don't sting me with hard questions, but you can ask about taxonomy, behavioral traits, diet (sweet, sweet nectar 🍯), habitats, and "
+        "conservation status!")
     ]
 
     _OUT_OF_SCOPE_RESPONSE = (
