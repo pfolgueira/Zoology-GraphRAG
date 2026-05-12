@@ -10,7 +10,7 @@ from ..agents import AgenticRAG
 from ..graph.neo4j_manager import Neo4jManager
 
 import time
-
+import json
 
 _MAX_CONTEXT_CHARS = 4000  # per-call limit to avoid truncated JSON responses
 
@@ -23,9 +23,21 @@ def _vprint(verbose: bool, *args: Any, **kwargs: Any) -> None:
 
 def _truncate_context(chunks: List[str], max_chars: int = _MAX_CONTEXT_CHARS) -> str:
     """Join context chunks and hard-truncate to avoid LLM token-limit JSON truncation."""
-    joined = "\n".join(chunks)
+    processed_chunks = []
+    
+    for chunk in chunks:
+        if isinstance(chunk, dict):
+            # If the chunk is a dictionary, convert it to a string (JSON format)
+            processed_chunks.append(json.dumps(chunk, ensure_ascii=False))
+        else:
+            # Ensure any other type is also cast to a string
+            processed_chunks.append(str(chunk))
+            
+    joined = "\n".join(processed_chunks)
+    
     if len(joined) > max_chars:
         joined = joined[:max_chars] + "\n[context truncated]"
+        
     return joined
 
 
@@ -57,9 +69,9 @@ def _is_no_retrieval_needed(text: str) -> bool:
         r"you are welcome",
         r"goodbye",
         r"hello",
-        r"Hoot hoot!",
-        r"Umm... moo",
-        r"With my eight arms and three brains"
+        r"hoot hoot!",
+        r"umm... moo",
+        r"with my eight arms and three brains"
     ]
     return any(_re.search(p, t) for p in patterns)
 
@@ -450,22 +462,6 @@ class RAGEvaluator:
             _vprint(verbose, "           Using conversational truthfulness mode...")
 
             verify_prompt = (
-                "Goal: Judge whether each statement is acceptable when NO external evidence context exists.\n\n"
-                "Mark verdict = 1 for:\n"
-                "- greetings and farewells\n"
-                "- conversational text\n"
-                "- assistant role/identity statements\n"
-                "- generic capability or helpfulness statements\n"
-                "- scope refusals ('This question is outside my scope', 'I only answer about X')\n"
-                "- harmless general descriptions\n\n"
-                "Mark verdict = 0 for:\n"
-                "- specific factual claims about the world requiring external evidence\n"
-                "- numbers, dates, or statistics about external events\n"
-                "- biographical or historical claims about specific people or events\n\n"
-                "Return exactly one verdict and one reasoning item per statement."
-            )
-
-            verify_prompt = (
                 "ROLE & DOMAIN:\n"
                 "You are an expert evaluator for a Zoology-focused Retrieval-Augmented Generation (RAG) system.\n\n"
                 
@@ -513,28 +509,6 @@ class RAGEvaluator:
         else:
             _vprint(verbose, "\n  [Step 2] Context detected.")
             _vprint(verbose, "           Using retrieval-grounded mode...")
-
-            verify_prompt = """
-    Goal: Judge the faithfulness of each statement using the provided context and question.
-
-    Return verdict = 1 if the statement is:
-    - explicitly supported by context
-    - semantically equivalent to context
-    - clearly implied by context using normal reasoning
-
-    Return verdict = 0 if the statement:
-    - adds unsupported new facts
-    - exaggerates certainty
-    - contradicts context
-    - requires speculation
-
-    Rules:
-    - Use semantic meaning, not exact wording.
-    - Minor paraphrases count as supported.
-    - Use the question to resolve shorthand answers.
-
-    Return exactly one verdict and one reasoning item per statement.
-    """
             
             verify_prompt = (
                 "ROLE & DOMAIN:\n"
@@ -887,7 +861,7 @@ class RAGEvaluator:
                 print(f"Failed to load evaluation backup: {e}")
                 start_idx_eval = 0
 
-        for idx_ev, (_, row) in enumerate(tqdm(df.iterrows(), total=len(df), desc="Evaluating")):
+        for idx_ev, (_, row) in enumerate(tqdm(results.iterrows(), total=len(results), desc="Evaluating")):
             if idx_ev < start_idx_eval:
                 continue
 
@@ -912,7 +886,29 @@ class RAGEvaluator:
         correctness_scores: List[float] = []
         tool_correct_scores: List[bool] = []
 
-        for _, row in tqdm(df.iterrows(), total=len(df), desc="Evaluating"):
+        import os
+        start_idx_eval = 0
+        if os.path.exists("evaluation_backup.csv"):
+            try:
+                e_df = pd.read_csv("evaluation_backup.csv", sep=";")
+                if "context_recall" in e_df.columns:
+                    valid_e_df = e_df.dropna(subset=["context_recall"])
+                    start_idx_eval = len(valid_e_df)
+                    if start_idx_eval > 0:
+                        print(f"Resuming evaluation from row {start_idx_eval + 1}...")
+                        recall_scores = valid_e_df["context_recall"].tolist()
+                        faithfulness_scores = valid_e_df["faithfulness"].tolist()
+                        correctness_scores = valid_e_df["answer_correctness"].tolist()
+                        tool_correct_scores = valid_e_df["is_tool_correct"].tolist()
+            except Exception as e:
+                print(f"Failed to load evaluation backup: {e}")
+                start_idx_eval = 0
+
+        for idx_ev, (_, row) in enumerate(tqdm(df.iterrows(), total=len(df), desc="Evaluating")):
+            if idx_ev < start_idx_eval:
+                continue
+
+            time.sleep(5)
             self.decomposed_answer = None  # Reset before each question
             if verbose:
                 print(f"\n{'━'*60}")
@@ -937,15 +933,44 @@ class RAGEvaluator:
             else:
                  is_tool_correct = False
 
-            recall = self.evaluate_context_recall(
-                row["question"], row["ground_truth"], contexts, verbose=verbose
-            )
-            faith = self.evaluate_faithfulness(
-                row["question"], row["answer"], contexts, verbose=verbose
-            )
-            corr = self.evaluate_answer_correctness(
-                row["question"], row["answer"], row["ground_truth"], verbose=verbose
-            )
+            recall = None
+            for _ in range(3):
+                try:
+                    recall = self.evaluate_context_recall(
+                        row["question"], row["ground_truth"], contexts, verbose=verbose
+                    )
+                    break
+                except Exception as e:
+                    print(f"Error en evaluate_context_recall: {e}. Reintentando en 10 segundos...")
+                    time.sleep(10)
+            if recall is None:
+                recall = {"recall": 0.0}
+
+            faith = None
+            for _ in range(3):
+                try:
+                    faith = self.evaluate_faithfulness(
+                        row["question"], row["answer"], contexts, verbose=verbose
+                    )
+                    break
+                except Exception as e:
+                    print(f"Error en evaluate_faithfulness: {e}. Reintentando en 10 segundos...")
+                    time.sleep(10)
+            if faith is None:
+                faith = {"faithfulness": 0.0}
+
+            corr = None
+            for _ in range(3):
+                try:
+                    corr = self.evaluate_answer_correctness(
+                        row["question"], row["answer"], row["ground_truth"], verbose=verbose
+                    )
+                    break
+                except Exception as e:
+                    print(f"Error en evaluate_answer_correctness: {e}. Reintentando en 10 segundos...")
+                    time.sleep(10)
+            if corr is None:
+                corr = {"answer_correctness": 0.0}
 
             recall_scores.append(float(recall.get("recall", 0.0)))
             faithfulness_scores.append(float(faith.get("faithfulness", 0.0)))
