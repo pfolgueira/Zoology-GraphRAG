@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import sys
 import os
 from dotenv import load_dotenv
+import re as _re
 
 # --- CONFIGURACIÓN DE TU SISTEMA RAG ---
 sys.path.append('.')
@@ -43,7 +44,8 @@ async def chat_endpoint(request: ChatRequest):
     try:
         # Llamamos a tu sistema RAG
         result = agentic_rag.answer(request.message)
-        return ChatResponse(answer=result['answer'])
+        answer_clean = _re.sub(r"\s*\[\d+\]", "", result['answer']).strip()
+        return ChatResponse(answer=answer_clean)
     except Exception as e:
         error_msg = str(e).lower()
         # Capturamos el error de Rate Limit de la API (15 peticiones/minuto)

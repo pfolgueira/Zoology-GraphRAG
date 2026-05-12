@@ -236,6 +236,7 @@ EXAMPLES OF LOGICAL FLOWS:
                                 
                         except Exception as e:
                             print(f"Error executing hybrid search for entity: {e}")
+                            raise e
 
                 # 4. Append retrieved chunks to global state
                 if chunks_text:

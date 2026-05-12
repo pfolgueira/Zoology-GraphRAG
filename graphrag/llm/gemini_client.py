@@ -43,7 +43,7 @@ class GeminiClient:
         """
         Pausa de 5 segundos antes de cada llamada.
         """
-        time.sleep(0.25)
+        time.sleep(0.5)
 
     def chat(
             self,

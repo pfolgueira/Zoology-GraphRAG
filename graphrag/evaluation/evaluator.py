@@ -5,8 +5,11 @@ from tqdm import tqdm
 from pydantic import BaseModel
 
 from ..llm.ollama_client import OllamaClient
+from ..llm.gemini_client import GeminiClient
 from ..agents import AgenticRAG
 from ..graph.neo4j_manager import Neo4jManager
+
+import time
 
 
 _MAX_CONTEXT_CHARS = 4000  # per-call limit to avoid truncated JSON responses
@@ -54,6 +57,9 @@ def _is_no_retrieval_needed(text: str) -> bool:
         r"you are welcome",
         r"goodbye",
         r"hello",
+        r"Hoot hoot!",
+        r"Umm... moo",
+        r"With my eight arms and three brains"
     ]
     return any(_re.search(p, t) for p in patterns)
 
@@ -74,7 +80,6 @@ def _is_abstention_answer(text: str) -> bool:
 class _AttributionResult(BaseModel):
     sentences: List[str]
     attributions: List[int]
-    recall: float
     reasoning: str
 
 class _Statements(BaseModel):
@@ -115,7 +120,8 @@ class RAGEvaluator:
     def __init__(self, rag: AgenticRAG, neo4j_manager: Neo4jManager):
         self.rag = rag
         self.neo4j = neo4j_manager
-        self.client = OllamaClient()
+        self.client = GeminiClient()
+        self.decomposed_answer = None
 
     # ------------------------------------------------------------------
     # Dataset helpers
@@ -130,13 +136,21 @@ class RAGEvaluator:
 
         Returns (None, []) on failure so the benchmark loop never crashes.
         """
-        try:
-            result = self.rag.answer(question)
-            answer = result["answer"]
-            context = result["iterations"][-1]["retrieval"]["context"]
-            return answer, context
-        except Exception:
-            return None, []
+        for attempt in range(3):
+            try:
+                result = self.rag.answer(question)
+                answer = result["answer"]
+                context = result["iterations"][-1]["retrieval"]["context"]
+                tools = result["iterations"][-1].get('tools', [result['iterations'][-1]['retrieval'].get('tool')])
+                return answer, context, tools
+            except Exception as e:
+                if attempt < 2:
+                    print(f"Error on attempt {attempt + 1}: {e}. Retrying in 10 seconds...")
+                    time.sleep(10)
+                else:
+                    print(f"Failed after 3 attempts: {e}")
+                    return None, []
+        return None, []
 
     # ------------------------------------------------------------------
     # RAGAS metrics
@@ -239,31 +253,39 @@ class RAGEvaluator:
         # CASE B: Context exists -> normal attribution
         # ---------------------------------------------------------
         system_prompt = (
-            "Goal: Determine whether the ground-truth answer is supported by the retrieved context.\n\n"
-            "IMPORTANT — short ground truths: if the ground truth is a single word or short phrase "
-            "(e.g. 'Germany', '1915', '2 person(s)'), use the question to interpret it as a full "
-            "statement (e.g. question='Where was Einstein born?', GT='Germany' → "
-            "'Einstein was born in Germany'). Then check if that statement is supported.\n\n"
-            "IMPORTANT — structured results: the context may contain raw graph query results "
-            "like {'count(p)': 2} or {'name': 'Ulm'}. Interpret these in light of the question.\n\n"
-            "Return attribution = 1 if the ground truth (interpreted as above) is:\n"
-            "- explicitly present in the context\n"
-            "- semantically equivalent to something in the context\n"
-            "- clearly implied by the context\n\n"
-            "Return attribution = 0 if unsupported, contradicted, or missing.\n\n"
-            "Use semantic meaning, not exact wording."
+            "ROLE & DOMAIN:\n"
+            "You are an expert evaluator system specializing in Zoology and animal biology.\n\n"
+            "TASK:\n"
+            "Your objective is to measure 'Context Recall'. You must determine to what extent the ground-truth "
+            "answer is supported by the retrieved context. You will do this by breaking down the ground truth "
+            "into individual claims and verifying them against the context.\n\n"
+            "INSTRUCTIONS:\n"
+            "1. Extract sentences: Break the ground truth answer down into individual, self-contained claims or sentences.\n"
+            "2. Interpret short answers: If the ground truth is a single word or short phrase (e.g., '22 months'), "
+            "use the question (e.g., 'What is the gestation period of an elephant?') to form a complete statement "
+            "('The gestation period of an elephant is 22 months').\n"
+            "3. Interpret structured data: The retrieved context may contain raw graph database results "
+            "(e.g., {'habitat': 'Savanna'}). Interpret these conceptually to check if they support the ground truth claims.\n"
+            "4. Use Context Headers: Context chunks may begin with metadata headers (e.g., 'Animal: Axolotl', 'Section: Evolution'). "
+            "Use this metadata to identify the main subject of the chunk and resolve any pronouns (like 'they', 'it', 'these creatures') "
+            "found in the text.\n"
+            "5. Assign Attributions: For each extracted sentence, assign an attribution of 1 if the claim is explicitly "
+            "present, semantically equivalent, or clearly implied by the context. Assign 0 if it is unsupported, "
+            "contradicted, or missing.\n"           
+            "CRITICAL:\n"
+            "Base your evaluation strictly on semantic meaning, not just exact keyword matching."
         )
-
         user_message = (
-            f"Question:\n{question}\n\n"
-            f"Context:\n{context_str}\n\n"
-            f"Ground truth answer:\n{ground_truth}"
+            f"Question: {question}\n\n"
+            f"Retrieved Context: {context_str}\n\n"
+            f"Ground Truth Answer: {ground_truth}\n\n"
+            "Analyze the ground truth sentence by sentence against the context and provide the final evaluation."
         )
 
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
-        ]
+        ]     
 
         _vprint(
             verbose,
@@ -364,17 +386,24 @@ class RAGEvaluator:
         # ---------------------------------------------------------
         # Step 1: Decompose answer into meaningful claims
         # ---------------------------------------------------------
-        decompose_prompt = """
-    Goal: Given a question and an answer, break the answer into meaningful factual or semantic statements.
-
-    Rules:
-    - Use concise standalone statements.
-    - Remove pronouns when possible.
-    - Ignore citation markers like [1], [2].
-    - Do NOT oversplit greetings or conversational intros.
-    - Do NOT split coordinated capability lists unless they express materially different claims.
-    - Prefer 1 combined statement over many tiny redundant statements.
-    """
+        decompose_prompt = (
+            "ROLE & DOMAIN:\n"
+            "You are an expert evaluator system specializing in Zoology and animal biology.\n\n"
+            "TASK:\n"
+            "Given a question and a factual answer, break the answer down into a list of concise, "
+            "standalone factual statements. This is the first step for a 'Faithfulness' evaluation.\n\n"
+            "INSTRUCTIONS:\n"
+            "1. Make statements standalone: Each statement must contain enough context to make sense "
+            "in complete isolation.\n"
+            "2. Resolve pronouns: Replace pronouns ('it', 'they', 'these creatures') with the specific animal "
+            "or entity being discussed in the answer. (e.g., 'It hunts at night' -> 'The leopard hunts at night').\n"
+            "3. Ignore citations: Remove any reference markers, brackets, or citations like [1], [2], or 'According to the text'.\n"
+            "4. Avoid oversplitting: Combine closely related attributes into a single factual statement rather "
+            "than making many redundant tiny statements (e.g., 'The frog is small and green' instead of "
+            "'The frog is small' and 'The frog is green').\n"
+            "5. Do not alter meaning: Extract the facts exactly as they are presented in the answer, even if "
+            "you know them to be biologically incorrect. Your job here is only extraction, not verification."
+        )
 
         _vprint(verbose, "\n  [Step 1] Decomposing the answer into statements...")
 
@@ -390,6 +419,7 @@ class RAGEvaluator:
                 _Statements,
             )
             statements = stmt_obj.statements
+            self.decomposed_answer = statements  # Store for potential later use in correctness evaluation
         except Exception as exc:
             _vprint(verbose, f"  [Step 1 ERROR] {exc}")
             return {
@@ -433,6 +463,30 @@ class RAGEvaluator:
                 "- numbers, dates, or statistics about external events\n"
                 "- biographical or historical claims about specific people or events\n\n"
                 "Return exactly one verdict and one reasoning item per statement."
+            )
+
+            verify_prompt = (
+                "ROLE & DOMAIN:\n"
+                "You are an expert evaluator for a Zoology-focused Retrieval-Augmented Generation (RAG) system.\n\n"
+                
+                "TASK:\n"
+                "Evaluate the 'Conversational Truthfulness' of statements generated when NO external database context "
+                "was retrieved. Your goal is to penalize factual hallucinations while allowing safe conversational filler "
+                "and intended animal-based roleplay.\n\n"
+                
+                "INSTRUCTIONS:\n"
+                "1. Assign Verdict = 1 (Acceptable) for:\n"
+                "   - Greetings, farewells, and polite conversational filler.\n"
+                "   - Animal persona roleplay or thematic identity claims (e.g., 'I am a dolphin navigating the data ocean', 'I use my gorilla muscles to fetch data'). These are designed UI features, NOT factual hallucinations.\n"
+                "   - Generic capability statements or offers to help.\n"
+                "   - Scope boundary setting and refusals (e.g., 'I cannot answer that', 'I only focus on zoology').\n\n"
+                
+                "2. Assign Verdict = 0 (Unacceptable / Hallucination) for:\n"
+                "   - Any specific zoological fact, biological trait, or claim about the animal kingdom. (Since there is no retrieved context, the system is forbidden from asserting zoological facts from its internal memory).\n"
+                "   - Specific numbers, dates, geographical data, or statistics about the real world.\n\n"
+                
+                "3. Output:\n"
+                "   - Ensure you return exactly one verdict (1 or 0) and a brief reasoning for each statement."
             )
 
             statements_str = "\n".join(
@@ -481,6 +535,32 @@ class RAGEvaluator:
 
     Return exactly one verdict and one reasoning item per statement.
     """
+            
+            verify_prompt = (
+                "ROLE & DOMAIN:\n"
+                "You are an expert evaluator for a Zoology-focused Retrieval-Augmented Generation (RAG) system.\n\n"
+                
+                "TASK:\n"
+                "Evaluate the 'Faithfulness' of generated statements against the retrieved context. Your goal is to "
+                "determine if every statement is strictly grounded in the provided context, penalizing any ungrounded claims.\n\n"
+                
+                "INSTRUCTIONS:\n"
+                "1. Use Context Headers: The context may contain metadata headers (e.g., 'Animal: Axolotl'). Use these "
+                "to resolve pronouns or implicit references when checking the statements.\n"
+                "2. Assign Verdict = 1 (Supported) if the statement is:\n"
+                "   - Explicitly supported by the provided context.\n"
+                "   - Semantically equivalent to information in the context.\n"
+                "   - Clearly and directly implied by the context using basic logic.\n"
+                "3. Assign Verdict = 0 (Unsupported/Hallucinated) if the statement:\n"
+                "   - Adds new zoological facts or details NOT present in the context (CRITICAL: Even if you know the fact is biologically true in the real world, mark it 0 if the context does not state it).\n"
+                "   - Contradicts the context.\n"
+                "   - Exaggerates certainty or requires unwarranted speculation.\n"
+                "4. Evaluation Rules:\n"
+                "   - Use semantic meaning rather than exact keyword matching.\n"
+                "   - Use the original question to interpret shorthand or fragmented statements.\n"
+                "5. Format Requirements:\n"
+                "   - Ensure you return exactly one verdict (1 or 0) and one brief reasoning string for each statement."
+            )
 
             statements_str = "\n".join(
                 f"{i + 1}. {s}" for i, s in enumerate(statements)
@@ -563,27 +643,43 @@ class RAGEvaluator:
         _vprint(verbose, f"  Ground truth: {ground_truth}")
 
         breakdown_prompt = (
-            "Goal: Given a question and an answer, analyze the complexity of each sentence "
-            "in the answer. Break down each sentence into one or more fully understandable "
-            "statements. Ensure that no pronouns are used in any statement. "
-            "Citation markers such as [1], [2] are NOT statements — ignore them entirely."
+            "ROLE & DOMAIN:\n"
+            "You are an expert evaluator system specializing in Zoology and animal biology.\n\n"
+            
+            "TASK:\n"
+            "Given a question and its verified Ground Truth answer, break the Ground Truth down into a list "
+            "of concise, standalone factual statements. This is a crucial step for an 'Answer Correctness' evaluation.\n\n"
+            
+            "INSTRUCTIONS:\n"
+            "1. Interpret short answers (CRITICAL): Ground Truths are often brief fragments (e.g., '22 months' or 'Savanna'). "
+            "You MUST use the provided original question to expand these fragments into fully formed, standalone statements. "
+            "(e.g., Question: 'Where does the lion live?', Ground Truth: 'Savanna' -> Output: 'The lion lives in the savanna').\n"
+            "2. Make statements standalone: Each statement must contain enough context to make sense in complete isolation.\n"
+            "3. Resolve pronouns: Replace any pronouns ('it', 'they') with the specific animal or entity being discussed.\n"
+            "4. Avoid oversplitting: Combine closely related attributes into a single factual statement rather than creating "
+            "artificially fragmented sentences.\n"
+            "5. Pure Extraction: Extract only what is present in the Ground Truth. Do not add your own external knowledge."
         )
 
         def _get_statements(text: str) -> List[str]:
+            # Limpiamos las citas por regex como medida de seguridad adicional antes de enviar al LLM
             clean = _re.sub(r"\s*\[\d+\]", "", text).strip()
-            obj = self.client.structured_output_with_chat(
-                [
-                    {"role": "system", "content": breakdown_prompt},
-                    {"role": "user", "content": f"Question: {question}\nText: {clean}"},
-                ],
-                _Statements,
-            )
-            return obj.statements
+            
+            try:
+                obj = self.client.structured_output_with_chat(
+                    [
+                        {"role": "system", "content": breakdown_prompt},
+                        {"role": "user", "content": f"Question: {question}\nText: {clean}"},
+                    ],
+                    _Statements,
+                )
+                return obj.statements
+            except Exception as exc:
+                _vprint(verbose, f"  [Breakdown ERROR] {exc}")
+                return []
 
-        _vprint(verbose, "\n  [Step 1] Decomposing the answer into statements...")
-        answer_statements = _get_statements(answer)
-        _vprint(verbose, f"  Answer statements ({len(answer_statements)}):")
-        for i, s in enumerate(answer_statements, 1):
+        _vprint(verbose, f"  Answer statements ({len(self.decomposed_answer)}):")
+        for i, s in enumerate(self.decomposed_answer, 1):
             _vprint(verbose, f"    {i}. {s}")
 
         _vprint(verbose, "\n  [Step 2] Decomposing the ground truth into statements...")
@@ -592,35 +688,35 @@ class RAGEvaluator:
         for i, s in enumerate(truth_statements, 1):
             _vprint(verbose, f"    {i}. {s}")
 
-        classify_prompt = """
-Goal: Compare answer statements against ground truth statements using semantic meaning,
-not exact wording.
+        classify_prompt = (
+            "ROLE & DOMAIN:\n"
+            "You are an expert evaluator system specializing in Zoology and animal biology.\n\n"
+            
+            "TASK:\n"
+            "Compare a list of generated 'Answer Statements' against a list of 'Ground Truth Statements' "
+            "to measure Answer Correctness. You must classify the semantic relationship using TP, FP, and FN.\n\n"
+            
+            "INSTRUCTIONS:\n"
+            "1. Evaluate 'Answer Statements' (TP vs. FP):\n"
+            "   - Assign TP (True Positive): The Answer Statement is explicitly stated, clearly implied, or "
+            "semantically equivalent to ANY of the Ground Truth Statements. CRITICAL: ALSO assign TP to any "
+            "harmless conversational filler, greetings, or persona roleplay (e.g., 'Hello!', 'I am a dolphin', "
+            "'Let me check my database'). Do not penalize the system for being polite or playing its character.\n"
+            "   - Assign FP (False Positive): The Answer Statement introduces materially new factual zoological "
+            "claims, unsupported details, or contradictions NOT justified by the Ground Truth.\n"
+            "2. Evaluate 'Ground Truth Statements' (FN):\n"
+            "   - Assign FN (False Negative): A Ground Truth Statement contains important information that is "
+            "entirely missing from the Answer Statements.\n"
+            "3. Rules for Semantic Matching:\n"
+            "   - Evaluate biological meaning, not exact wording.\n"
+            "   - Specific examples named in the Ground Truth may be restated as examples without penalty.\n"
+            "4. Formatting & Counting:\n"
+            "   - Provide a concise reasoning.\n"
+            "   - CRITICAL: The tp_count, fp_count, and fn_count integers MUST exactly match the total number of "
+            "TP, FP, and FN items in your classifications list."
+        )
 
-Classify each statement:
-
-TP (true positive):
-A statement in the answer that is explicitly stated OR clearly implied by the ground truth.
-Paraphrases, perspective shifts, grammatical rewrites, and equivalent restatements count as TP.
-
-FP (false positive):
-A statement in the answer that introduces materially new facts, unsupported claims,
-stronger specificity, or contradictions not justified by the ground truth.
-
-FN (false negative):
-An important statement in the ground truth missing from the answer.
-
-Rules:
-- Evaluate meaning, not wording.
-- "You can ask me about X" and "I can help with X" are equivalent.
-- Specific examples named in the ground truth may be restated as examples.
-- Minor stylistic additions should not count as FP.
-- Only penalize genuinely new factual content.
-
-tp_count, fp_count, fn_count must equal the classified totals.
-Provide concise reasons.
-"""
-
-        answer_str = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(answer_statements))
+        answer_str = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(self.decomposed_answer))
         truth_str = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(truth_statements))
 
         _vprint(verbose, "\n  [Step 3] Classifying each statement as TP / FP / FN...")
@@ -677,16 +773,41 @@ Provide concise reasons.
         Execute the ground-truth Cypher queries, call the agent for each question,
         and record answers, contexts and latency (mirrors Listing 8.2).
 
-        Input DataFrame must have columns: question, cypher
-        Output DataFrame adds:  ground_truth, answer, latency, retrieved_contexts
+        Input DataFrame must have columns: question, cypher, tool
+        Output DataFrame adds:  ground_truth, answer, latency, retrieved_contexts, used_tools, expected_tool
         Pass verbose=True to print each question, its ground truth and the agent's answer.
         """
         answers: List = []
         ground_truths: List = []
         latencies: List = []
         contexts: List = []
+        used_tools_list: List = []
+        expected_tools_list: List = []
+
+        import os
+        import ast
+        start_idx_bench = 0
+        if os.path.exists("benchmark_backup.csv"):
+            try:
+                b_df = pd.read_csv("benchmark_backup.csv", sep=";")
+                start_idx_bench = len(b_df)
+                if start_idx_bench > 0:
+                    print(f"Resuming benchmark from row {start_idx_bench + 1}...")
+                    answers = b_df["answer"].tolist()
+                    ground_truths = b_df["ground_truth"].tolist()
+                    latencies = b_df["latency"].tolist()
+                    contexts = [ast.literal_eval(c) if isinstance(c, str) and c.startswith('[') else c for c in b_df["retrieved_contexts"]]
+                    used_tools_list = b_df["used_tools"].tolist()
+                    expected_tools_list = b_df["expected_tool"].tolist()
+            except Exception as e:
+                print(f"Failed to load benchmark backup: {e}")
+                start_idx_bench = 0
 
         for i, (_, row) in enumerate(tqdm(dataset.iterrows(), total=len(dataset), desc="Processing rows"), 1):
+            if (i - 1) < start_idx_bench:
+                continue
+
+            time.sleep(5)
             _vprint(verbose, f"\n{'━'*60}")
             _vprint(verbose, f"  [{i}/{len(dataset)}] {row['question']}")
             _vprint(verbose, f"{'━'*60}")
@@ -697,35 +818,83 @@ Provide concise reasons.
             gt_records = self.neo4j.execute_query(row["cypher"])
             gt_values = []
             for r in gt_records:
-                val = r.get("ground_truth") if isinstance(r, dict) else str(r)
-                if val is not None and str(val) not in ("None", ""):
+                # Convertimos el registro de Neo4j a un diccionario estándar
+                r_dict = dict(r)
+                
+                # Si existe la columna ground_truth, la usamos. Si no, tomamos todo el diccionario.
+                if "ground_truth" in r_dict:
+                    val = r_dict["ground_truth"]
+                else:
+                    # Formatea las columnas en pares "clave: valor" (ej: "species: Elephant, preys_on: []")
+                    val = ", ".join([f"{k}: {v}" for k, v in r_dict.items() if v is not None])
+                
+                if val is not None and str(val) not in ("None", "", "{}"):
                     gt_values.append(str(val))
+            
             gt_str = "; ".join(gt_values) if gt_values else "This information is not in the knowledge base."
             ground_truths.append(gt_str)
             _vprint(verbose, f"  Ground truth: {gt_str}")
-
             # Call the agent
             _vprint(verbose, f"\n  [Step 2] Calling the RAG agent...")
             start = datetime.now()
             try:
-                answer, context = self.get_answer(row["question"])
+                answer, context, used_tools_val = self.get_answer(row["question"])
             except Exception:
-                answer, context = None, []
+                answer, context, used_tools_val = None, [], []
             elapsed = (datetime.now() - start).total_seconds()
             latencies.append(elapsed)
 
             _vprint(verbose, f"  Answer  : {answer}")
             _vprint(verbose, f"  Context chunks: {len(context)}")
             _vprint(verbose, f"  Latency : {elapsed:.2f}s")
+            _vprint(verbose, f"  Used tools: {used_tools_val}")
+            
+            expected_tool = row.get("tool", None)
+            _vprint(verbose, f"  Expected tool: {expected_tool}")
 
             answers.append(answer)
             contexts.append(context)
+            used_tools_list.append(used_tools_val)
+            expected_tools_list.append(expected_tool)
+
+            # Guardar backup intermedio de los resultados
+            temp_results = dataset.iloc[:i].copy()
+            temp_results["ground_truth"] = ground_truths
+            temp_results["answer"] = answers
+            temp_results["latency"] = latencies
+            temp_results["retrieved_contexts"] = contexts
+            temp_results["used_tools"] = used_tools_list
+            temp_results["expected_tool"] = expected_tools_list
+            temp_results.to_csv("benchmark_backup.csv", sep=";", index=False)
 
         results = dataset.copy()
         results["ground_truth"] = ground_truths
-        results["answer"] = answers
+        import os
+        start_idx_eval = 0
+        if os.path.exists("evaluation_backup.csv"):
+            try:
+                e_df = pd.read_csv("evaluation_backup.csv", sep=";")
+                if "context_recall" in e_df.columns:
+                    valid_e_df = e_df.dropna(subset=["context_recall"])
+                    start_idx_eval = len(valid_e_df)
+                    if start_idx_eval > 0:
+                        print(f"Resuming evaluation from row {start_idx_eval + 1}...")
+                        recall_scores = valid_e_df["context_recall"].tolist()
+                        faithfulness_scores = valid_e_df["faithfulness"].tolist()
+                        correctness_scores = valid_e_df["answer_correctness"].tolist()
+                        tool_correct_scores = valid_e_df["is_tool_correct"].tolist()
+            except Exception as e:
+                print(f"Failed to load evaluation backup: {e}")
+                start_idx_eval = 0
+
+        for idx_ev, (_, row) in enumerate(tqdm(df.iterrows(), total=len(df), desc="Evaluating")):
+            if idx_ev < start_idx_eval:
+                continue
+
         results["latency"] = latencies
         results["retrieved_contexts"] = contexts
+        results["used_tools"] = used_tools_list
+        results["expected_tool"] = expected_tools_list
         return results
 
     def evaluate_results(self, results_df: pd.DataFrame, verbose: bool = False) -> pd.DataFrame:
@@ -741,8 +910,10 @@ Provide concise reasons.
         recall_scores: List[float] = []
         faithfulness_scores: List[float] = []
         correctness_scores: List[float] = []
+        tool_correct_scores: List[bool] = []
 
         for _, row in tqdm(df.iterrows(), total=len(df), desc="Evaluating"):
+            self.decomposed_answer = None  # Reset before each question
             if verbose:
                 print(f"\n{'━'*60}")
                 print(f"  Q: {row['question']}")
@@ -751,6 +922,20 @@ Provide concise reasons.
             contexts = row["retrieved_contexts"]
             if isinstance(contexts, str):
                 contexts = [contexts]
+
+            # Compare exact match between used and expected
+            # Ensure used_tools is converted to a comparable format if needed. Here we assume lists or strings.
+            used = row.get("used_tools", [])
+            expected = row.get("expected_tool", "")
+            
+            # Simple check if expected tool name represents what was used. Customise if used_tools has format changes
+            if isinstance(used, list) and len(used) > 0:
+                 is_tool_correct = (expected.strip().lower() == str(used[-1]).strip().lower())
+                 # Adjust matching logic if used_tools format differs e.g. list of dicts.
+            elif isinstance(used, str):
+                 is_tool_correct = (expected.strip().lower() == used.strip().lower())
+            else:
+                 is_tool_correct = False
 
             recall = self.evaluate_context_recall(
                 row["question"], row["ground_truth"], contexts, verbose=verbose
@@ -765,10 +950,31 @@ Provide concise reasons.
             recall_scores.append(float(recall.get("recall", 0.0)))
             faithfulness_scores.append(float(faith.get("faithfulness", 0.0)))
             correctness_scores.append(float(corr.get("answer_correctness", 0.0)))
+            tool_correct_scores.append(is_tool_correct)
+
+            # Guardar backup intermedio de las evaluaciones
+            temp_df = df.iloc[:len(recall_scores)].copy()
+            temp_df["context_recall"] = recall_scores
+            temp_df["faithfulness"] = faithfulness_scores
+            temp_df["answer_correctness"] = correctness_scores
+            temp_df["is_tool_correct"] = tool_correct_scores
+            temp_df.to_csv("evaluation_backup.csv", sep=";", index=False)
 
         df["context_recall"] = recall_scores
         df["faithfulness"] = faithfulness_scores
         df["answer_correctness"] = correctness_scores
+        df["is_tool_correct"] = tool_correct_scores
+        
+        # Calculate overall accuracy
+        total_evaluations = len(tool_correct_scores)
+        correct_evaluations = sum(tool_correct_scores)
+        tool_accuracy = correct_evaluations / total_evaluations if total_evaluations > 0 else 0.0
+        
+        if verbose:
+            print(f"\n{'━'*60}")
+            print(f"  Tool Selection Accuracy: {tool_accuracy:.2%} ({correct_evaluations}/{total_evaluations})")
+            print(f"{'━'*60}")
+
         return df
 
     def print_summary(self, results_df: pd.DataFrame) -> None:

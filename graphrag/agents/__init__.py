@@ -153,7 +153,9 @@ STRICT RULES — follow all of them:
         for question, cypher in text2cypher_examples:
             self.router.tools.text2cypher.add_few_shot_example(question, cypher)
 
-    def add_terminology_maps(self, term: str, description: str):
+        print("Added text2cypher examples to the text2cypher retriever.")
+
+    def add_terminology_maps(self):
         """Agrega términos al mapa de terminología."""
         terminology_maps = [
             ("animal, creature, species", "Refers to the node with label (:Species)"),
@@ -161,5 +163,7 @@ STRICT RULES — follow all of them:
             ("country, continent, geographic region, area, located in", "Use the relationship [:FOUND_IN]->(:Location) to refer to specific geographical and political places."),
             ("biome, ecosystem, type of environment, terrain, inhabits", "Use the relationship [:INHABITS]->(:Habitat) to refer to the natural biome or habitat type.")    
         ]
-        for terms, explanation in terminology_maps:
+        for term, explanation in terminology_maps:
             self.router.tools.text2cypher.add_terminology_map(term, explanation)
+
+        print("Added terminology maps to the text2cypher retriever.")

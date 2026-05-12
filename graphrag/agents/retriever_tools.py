@@ -84,13 +84,13 @@ class RetrieverTools:
     _OUT_OF_SCOPE_RESPONSE = (
         "Umm... moo? 🐄 Sorry, this question is way outside my pasture. "
         "I am designed to chew the cud exclusively about zoology and animal biology. "
-        "If you have a question about the animal world, I am ready to help! Otherwise, I'm just going back to eating grass. 🌱"
+        "If you have a question about the animal world, I am ready to help! Otherwise, I am just going back to eating grass. 🌱"
     )
     
     _SKILLS_RESPONSE = (
         "With my eight arms and three brains, I can juggle detailed questions about specific animals! 🐙 "
         "You can ask me to dive deep into their taxonomic classification (family, genus, species), their physical characteristics, "
-        "what they eat, where they live, or their conservation status. Just don't ask me to untangle my tentacles! 🌊"
+        "what they eat, where they live, or their conservation status. Just do not ask me to untangle my tentacles! 🌊"
     )
 
     def get_tool_descriptions(self) -> List[Dict[str, Any]]:
