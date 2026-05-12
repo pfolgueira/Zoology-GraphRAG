@@ -10,7 +10,7 @@ const MessageBubble = ({ message }) => {
       <div 
         className={`max-w-[75%] px-4 py-3 rounded-2xl shadow-sm ${
           isUser 
-            ? 'bg-[#2FA084] text-white rounded-br-none' 
+            ? 'bg-[#9DA46C] text-white rounded-br-none' 
             : 'bg-[#EEEEEE] text-gray-800 rounded-bl-none border border-gray-200'
         }`}
       >
@@ -189,9 +189,9 @@ export default function ChatInterface() {
       </div>
 
       {/* Cabecera */}
-      <header className="flex justify-center items-center px-6 py-4 bg-white/10 backdrop-blur-sm border-b border-gray-200 shrink-0 z-10 relative">
-        <h1 className="text-3xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
-          {animalEmoji} Zoology Assistant
+      <header className="flex justify-center items-center px-6 py-4 shrink-0 z-10 relative">
+        <h1 className="text-4xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
+          {animalEmoji} Zoology Graph RAG
         </h1>
       </header>
 
@@ -217,9 +217,9 @@ export default function ChatInterface() {
           {isLoading && (
             <div className="flex w-full mb-4 justify-start">
               <div className="px-4 py-4 bg-[#EEEEEE] rounded-2xl rounded-bl-none border border-gray-200 flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-[#2FA084] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-[#2FA084] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-[#2FA084] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div className="w-2 h-2 bg-[#9DA46C] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-[#9DA46C] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-[#9DA46C] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
             </div>
           )}
@@ -238,19 +238,18 @@ export default function ChatInterface() {
       </main>
 
       {/* Zona de Entrada */}
-      <footer className="shrink-0 p-4 bg-white/10 backdrop-blur-sm z-10 relative border-t border-gray-200/50">
+      <footer className="shrink-0 p-4 z-10 relative">
         <div className="max-w-4xl mx-auto w-full relative flex items-end gap-2">
           {/* Reset button */}
           <button
             onClick={handleReset}
             title="Restart conversation"
-            className="flex shrink-0 items-center justify-center p-3 h-[52px] w-[52px] sm:w-auto sm:px-4 bg-white text-gray-600 rounded-xl shadow-sm hover:bg-gray-50 border border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-[#2FA084]"
+            className="flex shrink-0 items-center justify-center p-3 h-[52px] w-[52px] bg-white text-gray-600 rounded-xl shadow-sm hover:bg-gray-50 border border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-[#9DA46C]"
             aria-label="Restart conversation"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 sm:mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            <span className="hidden sm:inline font-medium text-sm">Restart</span>
           </button>
 
           <textarea
@@ -260,13 +259,13 @@ export default function ChatInterface() {
             onKeyDown={handleKeyDown}
             disabled={isLoading}
             placeholder="Type your message here..."
-            className="flex-1 min-h-[52px] resize-none overflow-hidden rounded-xl border border-gray-300 bg-white py-3 px-4 text-gray-800 shadow-sm focus:border-[#2FA084] focus:outline-none focus:ring-1 focus:ring-[#2FA084] disabled:bg-[#EEEEEE] disabled:text-gray-500"
+            className="flex-1 min-h-[52px] resize-none overflow-hidden rounded-xl border border-gray-300 bg-white py-3 px-4 text-gray-800 shadow-sm focus:border-[#9DA46C] focus:outline-none focus:ring-1 focus:ring-[#9DA46C] disabled:bg-[#EEEEEE] disabled:text-gray-500"
             rows={1}
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="flex shrink-0 items-center justify-center p-3 h-[52px] w-[52px] bg-[#2FA084] text-white rounded-xl shadow-sm hover:bg-[#1F6F5F] transition-colors disabled:bg-[#6FCF97] disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#2FA084] focus:ring-offset-2"
+            className="flex shrink-0 items-center justify-center p-3 h-[52px] w-[52px] bg-[#9DA46C] text-white rounded-xl shadow-sm hover:bg-[#838A56] transition-colors disabled:bg-[#C8CE9F] disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#9DA46C] focus:ring-offset-2"
             aria-label="Send message"
           >
             <svg 
@@ -279,9 +278,6 @@ export default function ChatInterface() {
             </svg>
           </button>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-2">
-          Press Enter to send, Shift + Enter for newline.
-        </p>
       </footer>
     </div>
   );
