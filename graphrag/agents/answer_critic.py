@@ -22,7 +22,7 @@ class AnswerCritique(BaseModel):
 
 class AnswerCritic:
     def __init__(self):
-        self.client = GeminiClient()
+        self.client = GroqClient()
 
     def critique(self, question: str, context: List[str], answer: str) -> Dict[str, Any]:
         """

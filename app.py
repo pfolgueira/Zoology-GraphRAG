@@ -44,16 +44,16 @@ async def chat_endpoint(request: ChatRequest):
     try:
         # Llamamos a tu sistema RAG
         result = agentic_rag.answer(request.message)
-        answer_clean = _re.sub(r"\s*\[\d+\]", "", result['answer']).strip()
+        answer_clean = _re.sub(r"\s*\[[\d,\s]+\]", "", result['answer']).strip()
         return ChatResponse(answer=answer_clean)
     except Exception as e:
         error_msg = str(e).lower()
         # Capturamos el error de Rate Limit de la API (15 peticiones/minuto)
-        if "rate limit" in error_msg or "429" in error_msg or "quota" in error_msg or "too many requests" in error_msg:
-            raise HTTPException(status_code=429, detail="Límite de peticiones de la API alcanzado. Por favor, espera un minuto.")
+        if "rate limit" in error_msg or "429" in error_msg or "quota" in error_msg or "too many requests" in error_msg or "high demand" in error_msg:
+            raise HTTPException(status_code=429, detail="Whoa there, human! You're sending requests faster than I can wiggle my tiny legs. Give me a minute to chew some lettuce and we'll try again 🥬")
         
         # Cualquier otro error del agente
-        raise HTTPException(status_code=500, detail=f"Error interno del agente: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error! Internal error! 🛠️We’re not exactly sure what exploded, but our monkey engineers are aggressively smashing keyboards to fix it.")
 
 @app.post("/api/reset")
 async def reset_endpoint():

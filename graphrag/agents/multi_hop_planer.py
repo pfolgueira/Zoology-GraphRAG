@@ -34,7 +34,7 @@ class MultiHopPlanner:
     def __init__(self, neo4j_manager: Neo4jManager, text2cypher_retriever: Text2CypherRetriever):
         self.neo4j = neo4j_manager
         self.text2cypher = text2cypher_retriever
-        self.client = GeminiClient()
+        self.client = GroqClient()
         self.vector_retriever = VectorRetriever(neo4j_manager)
         self.species_with_chunks = self._load_species_with_chunks()
         self.species_ranking = self._load_species_ranking()

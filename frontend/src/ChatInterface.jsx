@@ -55,8 +55,6 @@ export default function ChatInterface() {
 
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [requestTimestamps, setRequestTimestamps] = useState([]);
-  const [rateLimitError, setRateLimitError] = useState(false);
   
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -72,15 +70,7 @@ export default function ChatInterface() {
   // Auto-scroll al final cuando hay nuevos mensajes o cambia el estado de carga
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading, rateLimitError]);
-
-  // Limpiar el mensaje de error de rate limit después de un tiempo
-  useEffect(() => {
-    if (rateLimitError) {
-      const timer = setTimeout(() => setRateLimitError(false), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [rateLimitError]);
+  }, [messages, isLoading]);
 
 // --- FUNCIÓN ACTUALIZADA: REINICIAR CONVERSACIÓN ---
   const handleReset = async () => {
@@ -89,8 +79,6 @@ export default function ChatInterface() {
     setGreetingData(greetingOptions[Math.floor(Math.random() * greetingOptions.length)]);
     setInputValue('');
     setIsLoading(false);
-    setRequestTimestamps([]);
-    setRateLimitError(false);
 
     // 2. Avisar al backend de Python que limpie la memoria de AgenticRAG
     try {
@@ -107,24 +95,10 @@ export default function ChatInterface() {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput || isLoading) return;
 
-    // --- Control de límite de tasa en Frontend ---
-    const now = Date.now();
-    const oneMinuteAgo = now - 60000;
-    const recentRequests = requestTimestamps.filter(timestamp => timestamp > oneMinuteAgo);
-    
-    if (recentRequests.length >= 15) {
-      setRateLimitError(true);
-      return; 
-    }
-    
-    setRequestTimestamps([...recentRequests, now]);
-    // -------------------------------------------------------------
-
     // Actualizar UI con el mensaje del usuario
     setMessages(prev => [...prev, { role: 'user', content: trimmedInput }]);
     setInputValue('');
     setIsLoading(true);
-    setRateLimitError(false);
 
     // --- LLAMADA REAL AL BACKEND (FASTAPI) ---
     try {
@@ -137,12 +111,6 @@ export default function ChatInterface() {
       });
 
       if (!response.ok) {
-        // Manejar el error 429 de Rate Limit del backend
-        if (response.status === 429) {
-          setRateLimitError(true);
-          setIsLoading(false);
-          return;
-        }
         throw new Error(`Error HTTP: ${response.status}`);
       }
 
@@ -220,15 +188,6 @@ export default function ChatInterface() {
                 <div className="w-2 h-2 bg-[#9DA46C] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                 <div className="w-2 h-2 bg-[#9DA46C] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 <div className="w-2 h-2 bg-[#9DA46C] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
-            </div>
-          )}
-
-          {/* Mensaje de error de Rate Limit */}
-          {rateLimitError && (
-            <div className="flex justify-center mb-4">
-              <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-medium shadow-sm border border-red-100">
-                You've exceeded the request limit (15/min). Please wait a moment.
               </div>
             </div>
           )}

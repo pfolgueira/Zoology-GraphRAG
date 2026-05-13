@@ -93,7 +93,7 @@ class RouterDecision(BaseModel):
 class RetrieverRouter:
     def __init__(self, retriever_tools: RetrieverTools):
         self.tools = retriever_tools
-        self.client = GeminiClient()
+        self.client = GroqClient()
 
     def route(self, question: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> RouterDecision:
         """
