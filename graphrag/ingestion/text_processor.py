@@ -27,6 +27,15 @@ class TextProcessor:
             chunk_overlap: int = 50
     ):
         self.neo4j = neo4j_manager
+        try:
+            self.neo4j.create_vector_index(
+                index_name="species_name_embeddings",
+                label="Species",
+                property_name="name_embedding"
+            )
+        except Exception as e:
+            print(f"Error al crear el índice vectorial: {e}")
+
         self.embedding_gen = EmbeddingGenerator()
         self.entity_extractor = EntityExtractor()
         self.graph_cleaner = GraphCleaner(self.neo4j)
@@ -165,6 +174,9 @@ class TextProcessor:
             if k not in ["name", "type"] and v is not None
         }
 
+        if label == "Species":
+            properties["name_embedding"] = self.embedding_gen.embed_text(primary_value)
+
         primary_key = "name" if label == "Species" else "type"
 
         query = f"""
@@ -197,16 +209,18 @@ class TextProcessor:
             print(f"Relación [{rel_type}] omitida: Faltan origen o destino en el chunk {chunk_id}")
             return
 
-        # Aplicaa Entity Resolution a la especie de origen
         source_val = self._resolve_species_name(source_val)
         if source_val is None:
             return
+        source_embedding = self.embedding_gen.embed_text(source_val)
 
-        # Si la relación es de depredación, el destino también es una especie y requiere resolución
+        # Resolución y embedding del destino (si aplica)
+        target_embedding = None
         if rel_type == "PREYS_ON":
             target_val = self._resolve_species_name(target_val)
             if target_val is None:
                 return
+            target_embedding = self.embedding_gen.embed_text(target_val)
 
         # 3. Mapeo de etiquetas y propiedades basado estrictamente en tu diseño
         source_label = "Species"
@@ -246,73 +260,30 @@ class TextProcessor:
         query = f"""
         MATCH (c:Chunk {{id: $chunk_id}})
         MERGE (source:{source_label} {{{source_prop}: $source_val}})
+        SET source.name_embedding = $source_embedding
+        
         MERGE (target:{target_label} {{{target_prop}: $target_val}})
+        """
+        
+        # Inyectamos el vector en el destino solo si es una especie (PREYS_ON)
+        if target_embedding is not None:
+            query += "SET target.name_embedding = $target_embedding\n"
+            
+        query += f"""
         MERGE (c)-[:HAS_ENTITY]->(source)
         MERGE (c)-[:HAS_ENTITY]->(target)
         MERGE (source)-[r:{rel_type}]->(target)
         SET r += $properties
         """
-        
+    
         self.neo4j.execute_query(query, {
             "chunk_id": chunk_id,
             "source_val": source_val,
             "target_val": target_val,
-            "properties": properties
+            "properties": properties,
+            "source_embedding": source_embedding,
+            "target_embedding": target_embedding
         })
-
-    def _consolidate_entities(self):
-        """Consolida las descripciones de las entidades."""
-        query = """
-        MATCH (e:Entity)
-        WHERE size(e.description) > 1
-        RETURN e.name AS name, e.description AS descriptions
-        """
-        entities = self.neo4j.execute_query(query)
-
-        for entity in tqdm(entities, desc="Consolidando entidades"):
-            summary = self.entity_extractor.summarize_entity(
-                entity["name"],
-                entity["descriptions"]
-            )
-
-            update_query = """
-            MATCH (e:Entity {name: $name})
-            SET e.summary = $summary
-            """
-            self.neo4j.execute_query(update_query, {
-                "name": entity["name"],
-                "summary": summary
-            })
-
-    def _consolidate_relationships(self):
-        """Consolida las descripciones de las relaciones."""
-        query = """
-        MATCH (s:Entity)-[r:RELATIONSHIP]->(t:Entity)
-        WHERE size(r.description) > 1
-        RETURN s.name AS source, t.name AS target, r.description AS descriptions, r.strength AS strengths
-        """
-        relationships = self.neo4j.execute_query(query)
-
-        for rel in tqdm(relationships, desc="Consolidando relaciones"):
-            summary = self.entity_extractor.summarize_relationship(
-                rel["source"],
-                rel["target"],
-                rel["descriptions"]
-            )
-
-            avg_strength = sum(rel["strengths"]) / len(rel["strengths"])
-
-            update_query = """
-            MATCH (s:Entity {name: $source})-[r:RELATIONSHIP]->(t:Entity {name: $target})
-            SET r.summary = $summary,
-                r.avg_strength = $avg_strength
-            """
-            self.neo4j.execute_query(update_query, {
-                "source": rel["source"],
-                "target": rel["target"],
-                "summary": summary,
-                "avg_strength": avg_strength
-            })
 
     def _resolve_species_name(self, extracted_name: str) -> str:
         """
@@ -330,6 +301,12 @@ class TextProcessor:
                 return extracted_name[:-1].title()
         
         extracted_name = extracted_name.title()
+
+        # Similitud vectorial para reducir el espacio de búsqueda a las especies más cercanas semánticamente
+        entity_embedding = self.embedding_gen.embed_text(extracted_name)
+    
+        # Recuperamos el top 10 candidatos
+        candidate_species = self._get_top_k_candidate_species(entity_embedding, top_k=10)
 
         system_prompt = """You are an expert Knowledge Graph engineer and taxonomist working with a simplified, high-level animal ontology. 
         Your task is Entity Resolution. You will be given an extracted animal name and a canonical list of base animal entities.
@@ -349,7 +326,7 @@ class TextProcessor:
 
         5. NON-ANIMALS (DISCARD): If the extracted name is NOT an animal (e.g., a plant, geographic location, inanimate object, person, or abstract concept), you MUST discard it. Set status to 'DISCARD' and set 'resolved_name' to an empty string."""
 
-        user_message = f"Extracted Name: {extracted_name}\n\nCanonical List of Species: {self.species_names}"
+        user_message = f"Extracted Name: {extracted_name}\n\nCanonical List of Species: {candidate_species}"
 
         resolution: SpeciesResolution = self.gemini_client.structured_output(
             prompt=user_message,
@@ -371,6 +348,27 @@ class TextProcessor:
             print(f"Nueva especie añadida: {final_name}")
             
         return final_name
+    
+    def _get_top_k_candidate_species(self, entity_embedding: list[float], top_k: int = 10) -> list[str]:
+        """
+        Busca las Top K especies más parecidas semánticamente en Neo4j.
+        """
+        cypher_query = """
+        CALL db.index.vector.queryNodes('species_name_embeddings', $top_k, $entity_embedding)
+        YIELD node, score
+        WHERE score > 0.65 // Umbral mínimo de similitud
+        RETURN node.name AS species_name
+        """
+        try:
+            # Ajusta "self.execute_query" o el nombre de tu método de ejecución
+            results = self.execute_query(cypher_query, {
+                "entity_embedding": entity_embedding,
+                "top_k": top_k
+            })
+            return [record["species_name"] for record in results]
+        except Exception as e:
+            print(f"Error buscando candidatos vectoriales: {e}")
+            return []
     
     def _store_hypothetical_question(self, question: str, question_embedding: List[float], chunk_id: str):
         self.neo4j.execute_query("""

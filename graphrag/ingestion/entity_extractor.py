@@ -247,9 +247,6 @@ class GraphExtraction(BaseModel):
     has_conservation_status_rels: List[HasConservationStatusRel] = Field(default_factory=list)
 
 
-# ==========================================
-# PRUEBAS DEL REVIEWER
-# ==========================================
 class EntityPointer(BaseModel):
     category: str = Field(..., description="The category of the entity to delete (e.g., 'Species', 'Location', 'Habitat'...).")
     name_or_type: str = Field(..., description="The specific 'name' or 'type' value of the entity to delete.")
@@ -316,11 +313,6 @@ class GraphPatch(BaseModel):
         default_factory=MissingRelationships, 
         description="NEW relationships explicitly found in the text but missing from the initial extraction."
     )
-
-    # ==========================================
-# PRUEBAS DEL REVIEWER
-# ==========================================
-
 
 # ==========================================
 #   ENTITY EXTRACTOR CLASS
