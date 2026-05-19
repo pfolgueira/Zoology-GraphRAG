@@ -17,7 +17,7 @@ class Species(BaseModel):
 class Text2CypherRetriever:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
-        self.client = GeminiClient()
+        self.client = GroqClient()
         self.few_shot_examples = []
         self.terminology_maps = {}
         self._known_species: List[str] = self._load_known_species()

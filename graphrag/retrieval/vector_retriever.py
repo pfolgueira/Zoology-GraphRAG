@@ -121,3 +121,53 @@ class VectorRetriever:
         })
 
         return results
+    
+    def retrieve_filtered_by_entities(
+            self, 
+            query_embedding: List[float], 
+            entities_names: List[str], 
+            top_k: int = 1
+    ) -> List[Dict[str, Any]]:
+        """
+        Recupera los chunks más relevantes para una LISTA de especies en una sola consulta.
+        Realiza un cálculo matemático exacto (fuerza bruta) sobre el subgrafo de cada especie,
+        limitando los resultados al top_k por cada entidad de forma independiente.
+        """
+        
+        cypher_query = """
+        // Iteramos sobre la lista de especies que pasamos como parámetro
+        UNWIND $entities_names AS entity_name
+        
+        // Subconsulta para procesar y limitar los resultados POR CADA especie de manera aislada
+        CALL {
+            WITH entity_name
+            MATCH (chunk:Chunk)-[:HAS_ENTITY]->(s:Species {name: entity_name})
+            WHERE chunk.embedding IS NOT NULL
+            
+            // Calculamos la similitud exacta al vuelo
+            WITH chunk, vector.similarity.cosine(chunk.embedding, $query_embedding) AS score
+            
+            // Ordenamos y limitamos solo dentro del contexto de esta especie concreta
+            ORDER BY score DESC
+            LIMIT $top_k
+            
+            RETURN chunk.text AS text,
+                chunk.id AS chunk_id,
+                score
+        }
+        
+        // Retornamos todos los resultados combinados de todas las especies
+        RETURN text, 
+            chunk_id, 
+            score, 
+            entity_name AS entity_source
+        """
+
+        # Ejecutamos la consulta pasándole la lista de nombres en lugar de un solo string
+        results = self.neo4j.execute_query(cypher_query, {
+            "query_embedding": query_embedding,
+            "entities_names": entities_names,
+            "top_k": top_k
+        })
+
+        return results

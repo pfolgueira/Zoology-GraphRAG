@@ -193,15 +193,13 @@ EXAMPLES OF LOGICAL FLOWS:
                                     accumulated_entities.add(str(item))
 
             elif step.tool == "semantic_search":
-                # 1. Fast filtering: Intersection of accumulated entities and species with chunks
+                # Fast filtering: Intersection of accumulated entities and species with chunks
                 valid_entities = list(accumulated_entities.intersection(self.species_with_chunks))
 
                 if not valid_entities:
                     continue # Skip this step if no valid entities exist
 
-                # 2. Deterministic topological truncation (Top 10 most connected species)
-                # Sorts descending based on the graph degree cached in self.species_ranking.
-                # Uses .get(entity, 0) as a safe fallback in case an entity isn't in the dict.
+                # Deterministic topological truncation (Top 10 most connected species)
                 entities_to_search = sorted(
                     valid_entities, 
                     key=lambda entity: self.species_ranking.get(entity, 0), 
@@ -210,37 +208,19 @@ EXAMPLES OF LOGICAL FLOWS:
 
                 query_embedding = self.vector_retriever.embedding_gen.embed_text(step.query)
                 
-                chunks_text = []
-
-                # 3. Concurrent execution of hybrid searches (The rest remains identical...)
-                def search_by_entity(entity: str):
-                    # Llamamos al nuevo método que acabamos de crear en vector_retriever.py
-                    return self.vector_retriever.retrieve_filtered_by_entity(
+                try:
+                    search_results = self.vector_retriever.retrieve_filtered_by_entities(
                         query_embedding=query_embedding,
-                        entity_name=entity,
-                        top_k=1 # Ajusta esto según el tamaño de tu ventana de contexto
+                        entities_names=entities_to_search,
+                        top_k=1
                     )
-
-                # Using ThreadPoolExecutor to run searches in parallel
-                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                    futures = [executor.submit(search_by_entity, ent) for ent in entities_to_search]
                     
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            # search_result ya es una lista de diccionarios: [{text: "...", score: 0.9...}, {...}]
-                            search_result = future.result() 
-                            
-                            if search_result:
-                                # Añadimos directamente los 2 chunks de este animal a la lista global
-                                chunks_text.extend(search_result)
-                                
-                        except Exception as e:
-                            print(f"Error executing hybrid search for entity: {e}")
-                            raise e
-
-                # 4. Append retrieved chunks to global state
-                if chunks_text:
-                    combined_context.extend(chunks_text)
+                    if search_results:
+                        combined_context.extend(search_results)
+                        
+                except Exception as e:
+                    print(f"Error executing batch hybrid search for entities: {e}")
+                    raise e
 
         # Return the unified payload 
         return {
