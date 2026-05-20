@@ -135,19 +135,19 @@ class VectorRetriever:
         """
         
         cypher_query = """
-        // Iteramos sobre la lista de especies que pasamos como parámetro
+        // Iterar sobre la lista de especies proporcionada
         UNWIND $entities_names AS entity_name
         
-        // Subconsulta para procesar y limitar los resultados POR CADA especie de manera aislada
+        // Subconsulta para procesar y limitar los resultados POR CADA especie de manera independiente
         CALL {
             WITH entity_name
             MATCH (chunk:Chunk)-[:HAS_ENTITY]->(s:Species {name: entity_name})
             WHERE chunk.embedding IS NOT NULL
             
-            // Calculamos la similitud exacta al vuelo
+            // Calcular la similitud
             WITH chunk, vector.similarity.cosine(chunk.embedding, $query_embedding) AS score
             
-            // Ordenamos y limitamos solo dentro del contexto de esta especie concreta
+            // Ordenar y limitar los resultados para esta especie
             ORDER BY score DESC
             LIMIT $top_k
             
@@ -156,7 +156,7 @@ class VectorRetriever:
                 score
         }
         
-        // Retornamos todos los resultados combinados de todas las especies
+        // Devolver todos los resultados combinados
         RETURN text, 
             chunk_id, 
             score, 
