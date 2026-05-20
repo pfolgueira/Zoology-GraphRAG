@@ -146,7 +146,7 @@ EXAMPLES OF LOGICAL FLOWS:
   Flow:
   Step 1 (text2cypher): "List all feline species that can be found in Africa."
   Step 2 (text2cypher): "List all feline species that can be found in Asia."
-  Step 2 (semantic_search): "diet and eating habits"
+  Step 3 (semantic_search): "diet and eating habits"
 """
 
         messages = [
