@@ -308,6 +308,13 @@ class TextProcessor:
         # Recuperamos el top 10 candidatos
         candidate_species = self._get_top_k_candidate_species(entity_embedding, top_k=10)
 
+        if len(candidate_species) == 0:
+            self.species_names.add(extracted_name)
+            self.species_names_lower.add(extracted_name_lower)
+            print(f"Nueva especie añadida: {extracted_name}")
+            
+            return extracted_name
+
         system_prompt = """You are an expert Knowledge Graph engineer and taxonomist working with a simplified, high-level animal ontology. 
         Your task is Entity Resolution. You will be given an extracted animal name and a canonical list of base animal entities.
                 
