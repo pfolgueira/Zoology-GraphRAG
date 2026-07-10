@@ -1,6 +1,6 @@
-# GraphRAG-IAC 🦁🔍
+# Zoology GraphRAG 🦁🔍
 
-Sistema **Graph RAG** (Retrieval-Augmented Generation basado en grafos de conocimiento) aplicado al dominio de la **zoología y el mundo animal**, desarrollado como proyecto de la asignatura *Inteligencia Artificial en Aplicaciones Culturales* del **Máster en Inteligencia Artificial — Facultad de Informática, Universidad Complutense de Madrid** (Curso 2025-2026).
+Sistema **Graph RAG** (Retrieval-Augmented Generation basado en grafos de conocimiento) aplicado al dominio de la **zoología y el mundo animal**.
 
 El sistema construye automáticamente un grafo de conocimiento en **Neo4j** a partir de fuentes de datos abiertas (Wikipedia, A-Z Animals, Animalia), y permite responder preguntas en lenguaje natural combinando recuperación estructurada (Cypher), recuperación semántica (vectorial + full-text) y un sistema agéntico multi-paso capaz de razonar sobre consultas complejas.
 
