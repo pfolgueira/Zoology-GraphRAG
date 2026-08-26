@@ -10,7 +10,6 @@ from .graph_cleaner import GraphCleaner
 from .hypothetical_question_generator import HypotheticalQuestionGenerator
 from typing import Literal
 from pydantic import BaseModel, Field
-from ..llm.ollama_client import OllamaClient
 from ..llm.gemini_client import GeminiClient
 
 class SpeciesResolution(BaseModel):
@@ -44,7 +43,6 @@ class TextProcessor:
         self.chunk_overlap = chunk_overlap
 
         self.gemini_client = GeminiClient()
-        self.ollama_client = OllamaClient()
         self.species_names = set(species_names)
         self.species_names_lower = {animal.lower() for animal in species_names}
 

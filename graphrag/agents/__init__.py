@@ -1,6 +1,5 @@
 from typing import List, Dict, Any
 from ..graph.neo4j_manager import Neo4jManager
-from ..llm.ollama_client import OllamaClient
 from .retriever_tools import RetrieverTools
 from .retriever_router import RetrieverRouter
 from .answer_critic import AnswerCritic

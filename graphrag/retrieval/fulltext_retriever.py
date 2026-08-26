@@ -2,7 +2,6 @@ from typing import List, Dict, Any
 
 from graphrag.config import get_settings
 from graphrag.graph.neo4j_manager import Neo4jManager
-from graphrag.llm.ollama_client import OllamaClient
 from graphrag.llm.groq_client import GroqClient
 
 

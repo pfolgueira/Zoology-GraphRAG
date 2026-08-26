@@ -2,7 +2,6 @@ from typing import List, Dict, Any, Optional
 
 from ..llm.groq_client import GroqClient
 from ..llm.gemini_client import GeminiClient
-from ..llm.ollama_client import OllamaClient
 from .retriever_tools import RetrieverTools
 from typing import Literal
 from pydantic import BaseModel, Field, model_validator

@@ -3,7 +3,6 @@ import concurrent.futures
 
 from ..llm.groq_client import GroqClient
 from ..llm.gemini_client import GeminiClient
-from ..llm.ollama_client import OllamaClient
 from typing import Literal
 from pydantic import BaseModel, Field
 from graphrag.retrieval.vector_retriever import VectorRetriever

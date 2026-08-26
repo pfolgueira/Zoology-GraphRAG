@@ -1,7 +1,6 @@
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from ..llm.gemini_client import GeminiClient
-from ..llm.ollama_client import OllamaClient
 from ..llm.groq_client import GroqClient
 
 class AnswerCritique(BaseModel):

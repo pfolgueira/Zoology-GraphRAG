@@ -3,7 +3,6 @@ from typing import List, Dict, Any, Tuple, Optional
 from enum import Enum
 from pydantic import BaseModel, Field
 import json
-from ..llm.ollama_client import OllamaClient
 from ..llm.gemini_client import GeminiClient
 
 from pydantic import ValidationError

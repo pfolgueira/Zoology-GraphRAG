@@ -11,15 +11,19 @@ class Settings(BaseSettings):
     neo4j_user: str
     neo4j_password: str
 
-    # Ollama - LLM local
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen3.5:9b"
-
     # Embeddings
     openrouter_api_key: str
     embedding_model: str = "qwen/qwen3-embedding-8b"
     embedding_dimensions: int = 1024
 
+        # OpenRouter
+    openrouter_api_key: str
+    openrouter_embedding_model: str = "qwen/qwen3-embedding-8b"
+    openrouter_embedding_dimensions: int = 1024
+
+    # LLM
+    # openrouter_model: str
+    
     # Reranking
     openrouter_rerank_model: str = "cohere/rerank-4-fast"
 
@@ -34,6 +38,24 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
+class Settings(BaseSettings):
+
+    # Neo4j
+    neo4j_uri: str
+    neo4j_user: str
+    neo4j_password: str
+
+
+    # Processing
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+    top_k_candidates: int = 15
+    top_k_results: int = 5
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
 
 class GeminiSettings(BaseSettings):
 

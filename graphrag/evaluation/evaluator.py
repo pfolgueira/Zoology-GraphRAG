@@ -4,7 +4,6 @@ from datetime import datetime
 from tqdm import tqdm
 from pydantic import BaseModel
 
-from ..llm.ollama_client import OllamaClient
 from ..llm.gemini_client import GeminiClient
 from ..agents import AgenticRAG
 from ..graph.neo4j_manager import Neo4jManager
