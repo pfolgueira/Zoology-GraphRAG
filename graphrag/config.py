@@ -13,13 +13,8 @@ class Settings(BaseSettings):
 
     # Embeddings
     openrouter_api_key: str
-    embedding_model: str = "qwen/qwen3-embedding-8b"
-    embedding_dimensions: int = 1024
-
-        # OpenRouter
-    openrouter_api_key: str
     openrouter_embedding_model: str = "qwen/qwen3-embedding-8b"
-    openrouter_embedding_dimensions: int = 1024
+    embedding_dimensions: int = 1024
 
     # LLM
     # openrouter_model: str
