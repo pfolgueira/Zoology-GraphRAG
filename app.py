@@ -48,6 +48,7 @@ async def chat_endpoint(request: ChatRequest):
         return ChatResponse(answer=answer_clean)
     except Exception as e:
         error_msg = str(e).lower()
+        print(f"Error en /api/chat: {error_msg}")
         # Capturamos el error de Rate Limit de la API (15 peticiones/minuto)
         if "rate limit" in error_msg or "429" in error_msg or "quota" in error_msg or "too many requests" in error_msg or "high demand" in error_msg:
             raise HTTPException(status_code=429, detail="Whoa there, human! You're sending requests faster than I can wiggle my tiny legs. Give me a minute to chew some lettuce and we'll try again 🥬")
