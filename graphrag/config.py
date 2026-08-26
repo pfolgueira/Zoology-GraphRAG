@@ -23,28 +23,9 @@ class Settings(BaseSettings):
 
     # LLM
     # openrouter_model: str
-    
+
     # Reranking
     openrouter_rerank_model: str = "cohere/rerank-4-fast"
-
-    # Processing
-    chunk_size: int = 500
-    chunk_overlap: int = 50
-    top_k_candidates: int = 15
-    top_k_results: int = 5
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
-    )
-
-class Settings(BaseSettings):
-
-    # Neo4j
-    neo4j_uri: str
-    neo4j_user: str
-    neo4j_password: str
-
 
     # Processing
     chunk_size: int = 500
