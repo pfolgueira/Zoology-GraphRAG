@@ -1,5 +1,4 @@
 from typing import List, Dict, Any
-import importlib
 from ..graph.neo4j_manager import Neo4jManager
 from ..utils.embeddings import EmbeddingGenerator
 from ..config import get_settings

@@ -9,7 +9,7 @@ from ..llm.gemini_client import GeminiClient
 class AgenticRAG:
     def __init__(self, neo4j_manager: Neo4jManager):
         self.neo4j = neo4j_manager
-        self.client = GeminiClient()
+        self.client = GroqClient()
         self.tools = RetrieverTools(neo4j_manager)
         self.router = RetrieverRouter(self.tools)
         self.critic = AnswerCritic()
