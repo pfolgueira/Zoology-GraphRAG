@@ -67,7 +67,7 @@ class GroqSettings(BaseSettings):
     # Groq
     groq_api_key: str
     groq_model: str = Field(
-        default="llama-3.3-70b-versatile",
+        default="openai/gpt-oss-120b",
         validation_alias="GROQ_MODEL"
     )
 
