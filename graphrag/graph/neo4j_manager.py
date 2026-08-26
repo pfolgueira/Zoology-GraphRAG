@@ -5,10 +5,10 @@ from ..config import get_settings, get_gemini_settings
 
 class Neo4jManager:
     def __init__(self):
-        settings = get_gemini_settings()
+        self.settings = get_gemini_settings()
         self.driver = GraphDatabase.driver(
-            settings.neo4j_uri,
-            auth=(settings.neo4j_user, settings.neo4j_password)
+            self.settings.neo4j_uri,
+            auth=(self.settings.neo4j_user, self.settings.neo4j_password)
         )
 
     def close(self):
@@ -64,7 +64,7 @@ class Neo4jManager:
         FOR (n:{label})
         ON n.{property_name}
         OPTIONS {{indexConfig: {{
-            `vector.dimensions`: 768,
+            `vector.dimensions`: {self.settings.embedding_dimensions},
             `vector.similarity_function`: 'cosine'
         }}}}
         """

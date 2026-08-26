@@ -29,4 +29,5 @@ dependencies = [
     "torchvision>=0.26.0",
     "fastapi>=0.136.1",
     "matplotlib>=3.10.9",
+    "openai>=3.3.1",
 ]

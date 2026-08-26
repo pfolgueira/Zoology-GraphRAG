@@ -13,9 +13,9 @@ class VectorRetriever:
 
         try:
             self.neo4j.create_vector_index(
-                index_name="question_embeddings",
+                index_name="question_embeddings_new",
                 label="Question",
-                property_name="question_embedding"
+                property_name="question_embedding_new"
             )
         except Exception as e:
             print(f"Error al crear el índice vectorial: {e}")
@@ -42,7 +42,7 @@ class VectorRetriever:
     ) -> List[Dict[str, Any]]:
         """Recupera candidatos desde el índice vectorial de preguntas."""
         cypher_query = """
-        CALL db.index.vector.queryNodes('question_embeddings', $top_k_candidates, $query_embedding)
+        CALL db.index.vector.queryNodes('question_embeddings_new', $top_k_candidates, $query_embedding)
         YIELD node AS question, score
         MATCH (chunk:Chunk)-[:HAS_QUESTION]->(question)
         WITH chunk, max(score) AS score, collect(DISTINCT question.text) AS matched_questions

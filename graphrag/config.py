@@ -1,17 +1,24 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 class Settings(BaseSettings):
+
     # Neo4j
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
 
-    # Ollama
+    # Ollama - LLM local
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3.5:9b"
-    ollama_embedding_model: str = "nomic-embed-text"
+
+    # Embeddings
+    openrouter_api_key: str
+    embedding_model: str = "qwen/qwen3-embedding-8b"
+    embedding_dimensions: int = 1024
 
     # Processing
     chunk_size: int = 500
@@ -19,51 +26,70 @@ class Settings(BaseSettings):
     top_k_candidates: int = 15
     top_k_results: int = 5
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
+
 
 class GeminiSettings(BaseSettings):
+
     # Neo4j
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
 
     # Gemini
-    gemini_api_key: str 
-    gemini_model: str = Field(validation_alias="GEMINI_MODEL")
+    gemini_api_key: str
+    gemini_model: str = Field(
+        validation_alias="GEMINI_MODEL"
+    )
 
     # Processing
     chunk_size: int = 800
     chunk_overlap: int = 80
     top_k_results: int = 5
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
+
 
 class GroqSettings(BaseSettings):
+
     # Neo4j
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
 
     # Groq
-    groq_api_key: str 
-    # Añadimos un valor por defecto robusto para Groq, pero permitimos sobreescribirlo desde el .env
-    groq_model: str = Field(default="llama-3.3-70b-versatile", validation_alias="GROQ_MODEL")
+    groq_api_key: str
+    groq_model: str = Field(
+        default="llama-3.3-70b-versatile",
+        validation_alias="GROQ_MODEL"
+    )
 
     # Processing
     chunk_size: int = 800
     chunk_overlap: int = 80
     top_k_results: int = 5
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
 
 
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
 
+
 @lru_cache()
 def get_gemini_settings() -> GeminiSettings:
     return GeminiSettings()
+
 
 @lru_cache()
 def get_groq_settings() -> GroqSettings:

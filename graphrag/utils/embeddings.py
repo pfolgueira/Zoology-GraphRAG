@@ -1,15 +1,26 @@
-from typing import List
-from ..llm.ollama_client import OllamaClient
+from openai import OpenAI
+
+from graphrag.config import get_settings
 
 
 class EmbeddingGenerator:
+
     def __init__(self):
-        self.client = OllamaClient()
+        self.settings = get_settings()
 
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """Genera embeddings para una lista de textos."""
-        return self.client.embed(texts)
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.settings.openrouter_api_key,
+        )
 
-    def embed_text(self, text: str) -> List[float]:
-        """Genera embedding para un solo texto."""
-        return self.client.embed([text])[0]
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        response = self.client.embeddings.create(
+            model=self.settings.embedding_model,
+            input=texts,
+            dimensions=self.settings.embedding_dimensions,
+        )
+
+        return [item.embedding for item in response.data]
+
+    def embed_text(self, text: str) -> list[float]:
+        return self.embed_texts([text])[0]
