@@ -5,6 +5,9 @@ from pydantic import BaseModel
 import sys
 from dotenv import load_dotenv
 import re as _re
+import os
+
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # --- CONFIGURACIÓN DE TU SISTEMA RAG ---
 sys.path.append('.')
@@ -26,7 +29,7 @@ app = FastAPI(title="GraphRAG API")
 # IMPORTANTE: Configurar CORS para permitir peticiones desde React (Vite/Next.js)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción, cambia esto por la URL de tu frontend, ej: ["http://localhost:5173"]
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
