@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     embedding_model: str = "qwen/qwen3-embedding-8b"
     embedding_dimensions: int = 1024
 
+    # Reranking
+    openrouter_rerank_model: str = "cohere/rerank-4-fast"
+
     # Processing
     chunk_size: int = 500
     chunk_overlap: int = 50

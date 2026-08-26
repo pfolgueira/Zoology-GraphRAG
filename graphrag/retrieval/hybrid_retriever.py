@@ -1,11 +1,11 @@
 from typing import List, Dict, Any
 
+import requests
+
 from graphrag.config import get_settings
 from graphrag.graph.neo4j_manager import Neo4jManager
 from graphrag.retrieval.fulltext_retriever import FullTextRetriever
 from graphrag.retrieval.vector_retriever import VectorRetriever
-from sentence_transformers import CrossEncoder
-
 
 class HybridRetriever:
     def __init__(self, neo4j_manager: Neo4jManager):
@@ -13,7 +13,7 @@ class HybridRetriever:
         self.settings = get_settings()
         self.vector_retriever = VectorRetriever(neo4j_manager)
         self.fulltext_retriever = FullTextRetriever(neo4j_manager)
-        self.reranker = CrossEncoder('BAAI/bge-reranker-v2-m3')
+        self.rerank_model = self.settings.openrouter_rerank_model
 
     def retrieve(self, query: str, top_k: int = None) -> List[Dict[str, Any]]:
         """
@@ -31,31 +31,55 @@ class HybridRetriever:
 
         return reranked_results[:top_k_results]
 
-    def _rerank_results(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Aplica un modelo Cross-Encoder para reordenar los candidatos de forma precisa."""
+    def _rerank_results(
+        self,
+        query: str,
+        candidates: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Reordena los candidatos usando el reranker de OpenRouter."""
+
         if not candidates:
             return []
 
-        # Preparamos los pares [query, texto_del_documento] que espera el modelo
-        pairs = [[query, doc.get("text", "")] for doc in candidates]
+        documents = [
+            doc.get("text", "")
+            for doc in candidates
+        ]
 
-        # Calculamos los scores de relevancia con el modelo Cross-Encoder
-        scores = self.reranker.predict(pairs)
-
-        # Asignamos el nuevo score y ordenamos
-        for doc, score in zip(candidates, scores):
-            doc["rerank_score"] = float(score)
-            # Opcional: puedes mantener tu "score" híbrido anterior guardado por si lo necesitas
-            doc["hybrid_score"] = doc.get("score") 
-            doc["score"] = float(score) # Sobrescribimos el score principal para que dicte el orden final
-
-        sorted_results = sorted(
-            candidates,
-            key=lambda item: item.get("score", 0.0),
-            reverse=True,
+        response = requests.post(
+            "https://openrouter.ai/api/v1/rerank",
+            headers={
+                "Authorization": f"Bearer {self.settings.openrouter_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": self.rerank_model,
+                "query": query,
+                "documents": documents,
+                "top_n": len(documents),
+            },
+            timeout=60,
         )
 
-        return sorted_results
+        response.raise_for_status()
+
+        data = response.json()
+
+        reranked_results = []
+
+        for result in data["results"]:
+            index = result["index"]
+            score = float(result["relevance_score"])
+
+            doc = candidates[index].copy()
+
+            doc["rerank_score"] = score
+            doc["hybrid_score"] = doc.get("score")
+            doc["score"] = score
+
+            reranked_results.append(doc)
+
+        return reranked_results
 
     def _fuse_results(
         self,
