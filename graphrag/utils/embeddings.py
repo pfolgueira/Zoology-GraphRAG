@@ -15,7 +15,7 @@ class EmbeddingGenerator:
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         response = self.client.embeddings.create(
-            model=self.settings.embedding_model,
+            model=self.settings.openrouter_embedding_model,
             input=texts,
             dimensions=self.settings.embedding_dimensions,
         )
