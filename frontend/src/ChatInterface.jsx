@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import backgroundImg from './assets/01-background.png';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 // Sub-componente para renderizar cada mensaje
 const MessageBubble = ({ message }) => {
   const isUser = message.role === 'user';
@@ -82,7 +84,7 @@ export default function ChatInterface() {
 
     // 2. Avisar al backend de Python que limpie la memoria de AgenticRAG
     try {
-      await fetch('http://localhost:8000/api/reset', {
+      await fetch(`${API_URL}/api/reset`, {
         method: 'POST',
       });
     } catch (error) {
@@ -102,7 +104,7 @@ export default function ChatInterface() {
 
     // --- LLAMADA REAL AL BACKEND (FASTAPI) ---
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
