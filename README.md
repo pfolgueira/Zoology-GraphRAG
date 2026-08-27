@@ -98,14 +98,14 @@ GraphRAG-IAC/
 1. Clonar el repositorio:
 
    ```bash
-   git clone https://github.com/pfolgueira/GraphRAG-IAC.git
-   cd GraphRAG-IAC
+   git clone https://github.com/pfolgueira/Zoology-GraphRAG.git
+   cd Zoology-GraphRAG
    ```
 
 2. Instalar las dependencias del backend:
 
    ```bash
-   pip install -e .
+   uv sync
    ```
 
 3. Configurar las variables de entorno necesarias (credenciales de Neo4j y claves de API de los LLMs) en un archivo `.env` en la raíz del proyecto.
