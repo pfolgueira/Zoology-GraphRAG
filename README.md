@@ -6,6 +6,12 @@ El sistema construye automáticamente un grafo de conocimiento en **Neo4j** a pa
 
 > 📄 La memoria completa del proyecto está disponible en [`project_report.pdf`](./project_report.pdf).
 
+## Demo
+
+Prueba la aplicación: [**Zoology GraphRAG**](https://zoology-graph-rag.vercel.app/)
+
+![Zoology GraphRAG Demo](docs/demo.gif)
+
 ## Autores
 
 - Sandra Conde González
@@ -123,7 +129,7 @@ GraphRAG-IAC/
 2. Levantar el backend:
 
    ```bash
-   python app.py
+   uv run uvicorn app:app --host 0.0.0.0 --port 8000
    ```
 
 3. Levantar el frontend:
